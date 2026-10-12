@@ -1,6 +1,6 @@
 # Shared agent skills
 
-Private source of truth for Surge's 28 personal skills and coding defaults on the
+Private source of truth for Surge's 15 enabled personal skills and coding defaults on the
 MacBook Pro and Mac mini. Codex and Claude use links to the same checkout.
 
 ## Current setup
@@ -9,11 +9,48 @@ Both devices use `~/.agents/skill-config` as their checkout:
 
 | Device | Codex | Claude Code |
 | --- | --- | --- |
-| MacBook Pro | 28 personal skills; 15 enabled, 13 disabled | All 28 personal skills |
-| Mac mini | 28 personal skills; 15 enabled, 13 disabled | All 28 personal skills |
+| MacBook Pro | 15 enabled personal skills | The same 15 personal skills |
+| Mac mini | 15 enabled personal skills | The same 15 personal skills |
 
 Both providers also share `surge-defaults.md`. Sync is manual: changes reach
 another device after you push them to GitHub and run the sync command there.
+
+### Enabled and synced
+
+- `architect` — design ownership and module boundaries
+- `arena` — compare independent candidates
+- `breakdown` — concise change summaries
+- `create-verification` — verify supported Defuse changes
+- `grill-to-goal` — clarify goals and decisions
+- `improve-codebase-architecture` — find architectural improvements
+- `interrogate` — adversarial review
+- `karpathy-guidelines` — simple, focused coding
+- `reflect` — examine and improve skills and tooling
+- `retro` — learn from completed work
+- `ship` — commit, push and follow PR work
+- `surge-mode` — apply Surge's working style
+- `swarm` — parallel independent work
+- `thermo-nuclear-code-quality-review` — intensive code quality review
+- `worktree-dev` — create an isolated worktree
+
+### Previously disabled, now excluded
+
+These 13 skills were disabled in Codex. They have been removed from the current
+repository and are no longer synced to either provider:
+
+- `develop-web-game`
+- `frontend-code-review`
+- `grill-to-issue`
+- `investigate`
+- `one-pager`
+- `presentation`
+- `react-doctor`
+- `refactor-pass`
+- `show-me`
+- `takeover-pr`
+- `test-defuse`
+- `triple-review`
+- `write-essay`
 
 ## Sync an existing device
 
@@ -62,9 +99,12 @@ The installer creates links in `~/.agents/skills`, `~/.codex/skills` and
 `~/.agents/skill-backups` before replacement. Running installation twice leaves
 the same files and links in place.
 
-`manifest.json` records each personal skill's Codex enabled/disabled choice from
-the MacBook Pro. Claude receives all personal skills. Installation changes only
+`manifest.json` lists only the enabled skills to sync, with `codex_enabled: true`
+for each entry. Both providers receive the same set. Installation changes only
 the managed personal skill entries in Codex's config and preserves other settings.
+When a skill is removed from the manifest and repository, the installer backs up
+and removes its old repo-managed links and its Codex discovery entry. Unrelated
+local skills are preserved.
 Credentials, MCP configuration, provider plugin caches and app-managed `synced`
 skills are outside this repository.
 
@@ -72,8 +112,9 @@ skills are outside this repository.
 
 Sync before you start editing. Change skills under
 `~/.agents/skill-config/skills/<skill-name>/`, edit `surge-defaults.md` for shared
-coding defaults, or edit `manifest.json` for the managed skill list and Codex
-enabled/disabled choices. Provider skill paths are links to these same files.
+coding defaults, or edit `manifest.json` for the managed skill list. Provider
+skill paths are links to these same files. To stop syncing a skill, remove its
+manifest entry and its `skills/<skill-name>/` directory, then publish the change.
 
 Apply and check your edits, review the diff, then commit and push:
 
@@ -111,7 +152,7 @@ git -C ~/.agents/skill-config rev-parse HEAD
 - **GitHub authentication fails:** run `gh auth status`, then `gh auth login` if
   needed. Each Mac needs its own access to this private repository.
 - **A skill is missing in an existing session:** start a new provider session,
-  then rerun the checker. Codex intentionally keeps the choices in `manifest.json`.
+  then rerun the checker. Only the enabled skills listed above are synced.
 
 ## Verify
 
@@ -121,6 +162,7 @@ cd ~/.agents/skill-config
 python3 -m unittest discover -s tests
 ```
 
-The checker verifies skill names/descriptions, all 88 managed links and every
+The checker verifies skill names/descriptions, all 49 managed links and every
 managed Codex discovery setting. Tests cover repeat installation, backups,
-preservation of unrelated configuration and refusal to pull over local edits.
+cleanup of removed skills, preservation of unrelated configuration and refusal
+to pull over local edits.

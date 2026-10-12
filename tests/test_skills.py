@@ -78,6 +78,36 @@ class SkillInstallationTests(unittest.TestCase):
                 skills.sync()
         self.assertEqual((repo / "local-edit").read_text(), "Keep my edit\n")
 
+    def test_removed_skills_are_unlinked_and_unmanaged_skills_are_preserved(self):
+        skills.install()
+        retired = []
+        for root in skills.ROOTS:
+            path = self.home / root / "removed-skill"
+            path.symlink_to(skills.REPO / "skills/removed-skill")
+            retired.append(path)
+        unmanaged = self.home / ".claude/skills/local-only"
+        unmanaged.mkdir()
+        (unmanaged / "SKILL.md").write_text("Keep this local skill\n")
+        external = self.home / ".codex/skills/external"
+        external.symlink_to(unmanaged)
+        config = self.home / ".codex/config.toml"
+        with config.open("a") as file:
+            file.write('\n[[skills.config]]\npath = "' + str(self.home / '.codex/skills/removed-skill/SKILL.md') + '"\nenabled = false\n')
+        with self.assertRaises(SystemExit):
+            skills.check()
+        skills.install()
+        for path in retired:
+            self.assertFalse(path.is_symlink())
+        self.assertNotIn("removed-skill", config.read_text())
+        self.assertEqual((unmanaged / "SKILL.md").read_text(), "Keep this local skill\n")
+        self.assertEqual(external.resolve(), unmanaged.resolve())
+        backups = [directory / '.claude/skills/removed-skill'
+                   for directory in (self.home / ".agents/skill-backups").iterdir()
+                   if (directory / '.claude/skills/removed-skill').is_symlink()]
+        self.assertEqual(len(backups), 1)
+        self.assertTrue(backups[0].is_symlink())
+        skills.install()
+
 
 if __name__ == "__main__":
     unittest.main()

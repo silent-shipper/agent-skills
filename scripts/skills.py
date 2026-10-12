@@ -28,7 +28,7 @@ def manifest():
     for skill in data["skills"]:
         name = skill["name"]
         assert re.fullmatch(r"[a-z0-9-]+", name) and name not in names, name
-        assert isinstance(skill["codex_enabled"], bool), name
+        assert skill["codex_enabled"] is True, "Disabled skills must be removed from the synced manifest: " + name
         content = (REPO / "skills" / name / "SKILL.md").read_text()
         front = re.match(r"^---\n(.*?)\n---\n", content, re.S)
         field = re.search(r"^name:\s*(.*?)\s*$", front[1], re.M) if front else None
@@ -36,6 +36,19 @@ def manifest():
         assert re.search(r"^description:\s*\S", front[1], re.M), name
         names.add(name)
     return data["skills"]
+
+
+def retired_links(skills):
+    names = {skill["name"] for skill in skills}
+    paths = []
+    for root in ROOTS:
+        directory = HOME_DIR / root
+        for path in directory.iterdir() if directory.exists() else ():
+            if path.is_symlink() and path.name not in names:
+                target = path.resolve()
+                if target.parent == REPO / "skills" and target.name == path.name:
+                    paths.append(path)
+    return paths
 
 
 def managed_paths(skills):
@@ -58,9 +71,10 @@ def configured(text):
         yield match, Path(path[1]) if path else None, enabled[1] == "true" if enabled else None
 
 
-def skill_config(text, skills):
-    known = {str(HOME_DIR / root / s["name"] / "SKILL.md") for root in ROOTS for s in skills}
-    known.update(str(REPO / "skills" / s["name"] / "SKILL.md") for s in skills)
+def skill_config(text, skills, retired=()):
+    names = {s["name"] for s in skills} | {path.name for path in retired}
+    known = {str(HOME_DIR / root / name / "SKILL.md") for root in ROOTS for name in names}
+    known.update(str(REPO / "skills" / name / "SKILL.md") for name in names)
     for match, path, _ in reversed(list(configured(text))):
         if str(path) in known:
             text = text[:match.start()] + text[match.end():]
@@ -83,7 +97,10 @@ def install():
     directory = HOME_DIR / ".agents/skill-backups" / datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     config = HOME_DIR / ".codex/config.toml"
     old = config.read_text() if config.exists() else ""
-    new = skill_config(old, skills)
+    retired = retired_links(skills)
+    new = skill_config(old, skills, retired)
+    for path in retired:
+        backup(path, directory)
     for path, target in managed_paths(skills).items():
         if path.is_symlink() and path.resolve() == target:
             continue
@@ -104,7 +121,7 @@ def install():
 
 def check():
     skills = manifest()
-    errors = []
+    errors = ["Retired skill still linked: " + str(path) for path in retired_links(skills)]
     for path, target in managed_paths(skills).items():
         if not path.is_symlink() or path.resolve() != target or not target.exists():
             errors.append("Invalid link: " + str(path))
