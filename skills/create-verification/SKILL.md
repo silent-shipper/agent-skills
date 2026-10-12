@@ -151,6 +151,11 @@ operations; generating a test file is optional.
 - Use semantic hooks/state waits. No sleeps, forced/coordinate clicks, mock
   wallets, React internals or machine events to bypass behavior. Add missing
   hooks at the owning Interface and update `test/CONTRACT.md`.
+- When a required interaction repeatedly fails, inspect the trace to distinguish
+  a runner limitation from a product defect before queuing another identical
+  attempt. Preserve the run’s canonical verdict. If the runner cannot drive the
+  control, use or add an owning semantic helper in the managed session. A separate
+  helper-only test is supplemental.
 - AI navigates the app; deterministic tools own real MetaMask popups. Keep
   credentials/auth payloads out of goals and shared evidence.
 - Match account, balance plane and exact asset variant. Current ordinary Defuse
