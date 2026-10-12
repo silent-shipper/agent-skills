@@ -250,16 +250,22 @@ def report_update(previous, files, guide, out, head):
     before = previous["files"]
     guided = {path for chapter in guide.get("chapters", []) for path in chapter.get("files", [])}
     current = {f["path"]: fingerprint(f) for f in files}
-    new = sorted(path for path in current if path not in guided)
+    tests = {f["path"] for f in files if f["label"] == "tests"}
+    new = sorted(path for path in current if path not in guided and path not in tests)
     gone = sorted(path for path in guided if path not in current)
     changed = sorted(path for path in current if path in guided and before.get(path) != current[path])
     old_head = short(previous.get("head"))
-    if not (new or gone or changed):
+    by_path = {f["path"]: f for f in files}
+    sides = {"+": " (added line)", "-": " (removed line)", "": ""}
+    moved = sorted(key.partition("|")[2] + sides[key.partition("|")[0]]
+                   for key, text in previous.get("targets", {}).items() if target_text(key, by_path) != text)
+    if not (new or gone or changed or moved):
         print(f"\nExisting guide written for {old_head} still matches every file. Render it again as is.")
         return
     print(f"\nExisting guide was written for {old_head}. Update guide.json instead of rewriting it:")
     for title, paths in (("New, not in any chapter", new), ("Gone, remove from chapters", gone),
-                         ("Changed since the guide was written", changed)):
+                         ("Changed since the guide was written", changed),
+                         ("Before / after `at` targets whose line moved or changed; point them at the right line", moved)):
         if paths:
             print(f"  {title}:\n    " + "\n    ".join(paths))
     if write_since(out, previous, head, sorted(set(new + changed))):
@@ -771,6 +777,31 @@ def file_row(file):
             f'<span class="fcount">{counts(file["additions"], file["deletions"])}</span></a>')
 
 
+def target_text(at_key, files):
+    """The code an `at` target points at: at_key is "op|file:line" as stored in rendered.json."""
+    op, _, at = at_key.partition("|")
+    target = resolve_at(at, files)
+    if not target:
+        return None
+    for hunk in files[target[0]]["hunks"]:
+        for line in hunk["lines"]:
+            if line_matches(line, target[1], op or None):
+                return line["s"]
+    return None
+
+
+def guide_targets(guide, files):
+    blocks = guide["overview"].get("before_after") or []
+    keys = {}
+    for block in blocks if isinstance(blocks, list) else [blocks]:
+        for item in block.get("lines", []) + block.get("nodes", []):
+            if item.get("at"):
+                op = item.get("op") or ("-" if item.get("type") == "removed" else "")
+                key = f"{op}|{item['at']}"
+                keys[key] = target_text(key, files)
+    return keys
+
+
 def line_matches(line, number, op):
     """A '-' target names a removed line (old numbering); '+' an added line; context a line on the new side."""
     if op == "-":
@@ -931,7 +962,7 @@ def render(args):
         (directory / "rendered.patch").write_text((directory / "diff.patch").read_text())
     (directory / "rendered.json").write_text(json.dumps(
         {"head": meta.get("head"), "files": {path: fingerprint(file) for path, file in files.items()},
-         "baseline": baseline}))
+         "baseline": baseline, "targets": guide_targets(guide, files)}))
     print(out)
 
 

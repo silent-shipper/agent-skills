@@ -26,8 +26,9 @@ that is the main checkout's shared git dir, so every worktree sees the same guid
 `Write:` and `Then:` paths it prints. It warns when uncommitted or untracked work is left out; mention it if it matters.
 
 **New push on a change that already has a guide:** collect again into the same directory. It reports which files are new,
-gone or changed since the guide was rendered and writes `since-guide.patch` with exactly what changed in them. Read it,
-then update the chapters, overview steps and Before / after lines those changes make wrong or incomplete, and fix any
+gone or changed since the guide was rendered and writes `since-guide.patch` with exactly what changed in them. It also lists
+Before / after `at` targets whose line moved. Read the patch, then update the chapters, overview steps and Before /
+after lines (and those `at` targets) the changes make wrong or incomplete, and fix any
 other statement you find false (for example, a chapter about a file that is now deleted). Keep everything else as it
 is, then do steps 4–5. If it reports that the guide still matches, render it and do step 4's reread only.
 
