@@ -76,4 +76,6 @@ is available, and reply with one line per PR: number, written or updated, path. 
 schedule a recurring run whose prompt is `$review-guide pending in <repository path>`.
 
 The page is self-contained and works offline (avatars aside) and fills wide screens. Reviewed checkboxes persist per change in the browser. `rendered.json` records what the guide was rendered from, for the
-update check in step 1.
+update check in step 1, and the
+render before it: after a push, files and chapters that changed since that render show "updated since <sha>", and a
+file's Reviewed tick holds only while its diff is unchanged, so the reader re-reviews just what moved.

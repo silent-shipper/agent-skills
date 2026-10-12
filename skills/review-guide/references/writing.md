@@ -25,8 +25,9 @@ the view ("call tree", "flow"); usually omit it. Two kinds:
 
 - **Tree** (default). `lines`: `{ "op": "-" | "+" (omit for context), "depth": 0.., "text": "...", "note": "muted aside",
   "ref": 3, "at": "load-blob.ts:42" }`. An integer `ref` renders as a boxed `03` linking to that chapter. `at` renders as
-  a muted `load-blob.ts 42` that opens that exact line of the diff and highlights it; use the new line number for `+`
-  and context lines and the old one for `-` lines (render rejects a line that is not in the diff). The file part may be
+  a muted `load-blob.ts 42` that opens that exact line of the diff and highlights it; a `+` line must name an added line
+  (new numbering), a `-` line a removed line (old numbering), and a context line any line on the new side; render
+  rejects anything else. The file part may be
   any unique path suffix. The card header counts `+` and `-` lines.
 - **Diagram** (rare): `{ "kind": "diagram", "caption": "...", "nodes": [ { "id": "a", "text": "takeShare()", "type":
   "new | removed | decision | plain", "tag": "optional, e.g. New · step.ts", "ref": 1, "at": "optional file:line" } ], "rows": [["a", "b"], ["c"]],
@@ -92,8 +93,8 @@ borrowed the title from. Write it like a good PR title.
 - `-` lines are what the old path did; `+` lines are what it does now. Unchanged calls stay as context so the reader
   sees where the change sits.
 - Put the meaning in `note`, in plain words, on the changed lines ("a cached failure was returned for the rest of the
-  session"). Every `+` and `-` line gets the `ref` of the chapter that implements it and an `at` pointing at the line
-  that does it, so a click opens that code.
+  session"). Every `+` and `-` line gets the `ref` of the chapter where that behavior is decided (not merely called)
+  and an `at` pointing at the line that does it, so a click opens that code.
 - 4–12 lines. If it needs more, the path is too broad; show the one a reviewer most needs.
 
 **Default to the tree**; a weak diagram is worse than none. Draw a diagram only when all of these hold:

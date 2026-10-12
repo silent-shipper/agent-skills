@@ -2,11 +2,14 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const storageKey = document.body.dataset.key;
-  const reviewed = new Set(JSON.parse(localStorage.getItem(storageKey) || "[]"));
+  const stored = JSON.parse(localStorage.getItem(storageKey) || "{}");
+  const reviewed = stored && !Array.isArray(stored) ? stored : {};
+  const versions = Object.fromEntries($$(".file[data-path]").map((card) => [card.dataset.path, card.dataset.version]));
+  const isReviewed = (path) => reviewed[path] === versions[path];
   const allPaths = [...new Set($$(".file[data-path]").map((card) => card.dataset.path))];
 
   const activeTab = () => $(".tab:not([hidden])");
-  const save = () => localStorage.setItem(storageKey, JSON.stringify([...reviewed]));
+  const save = () => localStorage.setItem(storageKey, JSON.stringify(reviewed));
 
   function expand(card) {
     card.classList.remove("collapsed");
@@ -15,22 +18,23 @@
 
   function sync() {
     for (const card of $$(".file[data-path]")) {
-      const done = reviewed.has(card.dataset.path);
+      const done = isReviewed(card.dataset.path);
       card.classList.toggle("reviewed", done);
       $("[data-review]", card).checked = done;
     }
-    for (const row of $$(".frow")) row.classList.toggle("done", reviewed.has(row.dataset.path));
+    for (const row of $$(".frow")) row.classList.toggle("done", isReviewed(row.dataset.path));
     for (const box of $$("[data-chapter]")) {
       const files = JSON.parse(box.closest(".chapter").dataset.files);
-      box.checked = files.every((path) => reviewed.has(path));
+      box.checked = files.every(isReviewed);
     }
-    const count = allPaths.filter((path) => reviewed.has(path)).length;
+    const count = allPaths.filter(isReviewed).length;
     $("#progress").textContent = `${count} / ${allPaths.length} reviewed`;
   }
 
   function setReviewed(paths, done) {
     for (const path of paths) {
-      done ? reviewed.add(path) : reviewed.delete(path);
+      if (done) reviewed[path] = versions[path];
+      else delete reviewed[path];
       for (const card of $$(".file[data-path]")) {
         if (card.dataset.path !== path) continue;
         if (done) card.classList.add("collapsed");
@@ -138,7 +142,7 @@
     time.title = new Date(created).toLocaleString();
   }
 
-  for (const card of $$(".file[data-path]")) if (reviewed.has(card.dataset.path)) card.classList.add("collapsed");
+  for (const card of $$(".file[data-path]")) if (isReviewed(card.dataset.path)) card.classList.add("collapsed");
   sync();
 
   const SVG = "http://www.w3.org/2000/svg";

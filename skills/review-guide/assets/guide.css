@@ -111,6 +111,8 @@ main { padding: 22px clamp(32px, 3vw, 72px) 160px clamp(56px, 4vw, 96px); }
 .file.reviewed .fh .fname { color: var(--muted); }
 .more { color: var(--muted); letter-spacing: 1px; padding: 0 4px; }
 .fstatus { color: var(--muted); }
+.fupd, .cupd { padding: 1px 7px; border-radius: 10px; background: color-mix(in srgb, #e3b341 18%, transparent); color: color-mix(in srgb, #9a6700 85%, var(--text)); font-size: 12px; white-space: nowrap; }
+[data-theme="dark"] .fupd, [data-theme="dark"] .cupd { color: #e3b341; }
 .fh .fcount { font-size: 14px; }
 .fh .rv { margin-left: 6px; }
 .bal { color: var(--muted); margin-left: 2px; }

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Collect a change and render it as a Capy-style guided review page."""
 import argparse
+import hashlib
 import html
 import json
 import re
@@ -263,6 +264,10 @@ def report_update(previous, files, guide, out, head):
             print(f"  {title}:\n    " + "\n    ".join(paths))
     if write_since(out, previous, head, sorted(set(new + changed))):
         print(f"  What changed since the guide: {out / 'since-guide.patch'}")
+
+
+def version(file):
+    return hashlib.sha1(fingerprint(file).encode()).hexdigest()[:12]
 
 
 def short(head):
@@ -596,7 +601,7 @@ def counts(additions, deletions):
     return " ".join(parts)
 
 
-def file_card(file, prefix, collapsed_reason=None):
+def file_card(file, prefix, collapsed_reason=None, since=None):
     name, directory = split_path(file["path"])
     status = {"added": "added", "deleted": "deleted"}.get(file["status"], "")
     if file["status"] == "renamed":
@@ -604,19 +609,19 @@ def file_card(file, prefix, collapsed_reason=None):
     total = sum(len(h["lines"]) for h in file["hunks"])
     reason = collapsed_reason
     if not reason and file["status"] == "deleted":
-        reason = f"Deleted file · {file['deletions']} lines"
+        reason = f"Deleted file · {file['deletions']} line{'s' if file['deletions'] != 1 else ''}"
     if not reason and total > 800:
         reason = f"Large diff · {total} lines"
     body = file_body(file) if file["hunks"] or file["binary"] else '<div class="note">No content changes</div>'
     lazy = f'<div class="lazy"><button>{esc(reason)} · Show diff</button></div>' if reason else ""
     return f"""
-<section class="file{' collapsed' if reason else ''}" id="{prefix}-{esc(file['path'])}" data-path="{esc(file['path'])}">
+<section class="file{' collapsed' if reason else ''}{' updated' if since else ''}" id="{prefix}-{esc(file['path'])}" data-path="{esc(file['path'])}" data-version="{version(file)}">
   <header class="fh">
     <button class="chev" aria-label="Collapse"><svg viewBox="0 0 16 16"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg></button>
     {file_icon(file['path'])}<span class="fname">{esc(name)}</span><span class="fdir">{esc(directory)}</span>
     <span class="sp"></span>
     <button class="more" title="Copy path" data-copy="{esc(file['path'])}">···</button>
-    <span class="fstatus">{status}</span><span class="fcount">{counts(file['additions'], file['deletions'])}</span>
+    {f'<span class="fupd">updated since {esc(since)}</span>' if since else ''}<span class="fstatus">{status}</span><span class="fcount">{counts(file['additions'], file['deletions'])}</span>
     <label class="rv">Reviewed <input type="checkbox" data-review="{esc(file['path'])}"></label>
   </header>
   {lazy}<div class="fb">{body}</div>
@@ -766,6 +771,15 @@ def file_row(file):
             f'<span class="fcount">{counts(file["additions"], file["deletions"])}</span></a>')
 
 
+def line_matches(line, number, op):
+    """A '-' target names a removed line (old numbering); '+' an added line; context a line on the new side."""
+    if op == "-":
+        return line["t"] == "-" and line.get("o") == number
+    if op == "+":
+        return line["t"] == "+" and line.get("n") == number
+    return line["t"] != "-" and line.get("n") == number
+
+
 def validate(data, guide):
     errors = []
     paths = [f["path"] for f in data["files"]]
@@ -811,10 +825,22 @@ def validate(data, guide):
             target = resolve_at(item["at"], by_path)
             if not target:
                 errors.append(f"before/after at '{item['at']}' must be 'path:line' naming exactly one changed file")
-            elif not any(target[1] in (line.get("n"), line.get("o"))
+            elif not any(line_matches(line, target[1], item.get("op") or ("-" if item.get("type") == "removed" else None))
                          for hunk in by_path[target[0]]["hunks"] for line in hunk["lines"]):
-                errors.append(f"before/after at '{item['at']}': line {target[1]} is not in that file's diff")
+                side = {"-": "a removed", "+": "an added"}.get(item.get("op"), "a")
+                errors.append(f"before/after at '{item['at']}': line {target[1]} is not {side} line in that file's diff")
     return errors
+
+
+def baseline_for(directory, head):
+    """The previous render this guide is compared with: the last render for another head."""
+    snapshot = directory / "rendered.json"
+    if not snapshot.exists():
+        return None
+    previous = json.loads(snapshot.read_text())
+    if previous.get("head") != head:
+        return {"head": previous.get("head"), "files": previous.get("files", {})}
+    return previous.get("baseline")
 
 
 def render(args):
@@ -832,6 +858,10 @@ def render(args):
     title = guide.get("title") or meta["title"]
     additions = sum(f["additions"] for f in files.values())
     deletions = sum(f["deletions"] for f in files.values())
+    baseline = baseline_for(directory, meta.get("head"))
+    since = short(baseline["head"]) if baseline else None
+    updated = {path for path, file in files.items() if baseline and baseline["files"].get(path) != fingerprint(file)}
+    stamp = lambda path: since if path in updated else None
     total = len(chapters)
 
     steps = "".join(f"<li>{prose(s)}</li>" for s in overview.get("steps", []))
@@ -850,7 +880,10 @@ def render(args):
         label = chapter.get("label")
         tag = f'<span class="clabel">{LABEL_ICONS[label]}{label.title()}</span>' if label else ""
         chapter_files = [files[p] for p in chapter["files"]]
-        cards = "".join(file_card(f, "g", "Generated" if label == "generated" else None) for f in chapter_files)
+        cards = "".join(file_card(f, "g", "Generated" if label == "generated" else None, stamp(f["path"]))
+                        for f in chapter_files)
+        changed = any(f["path"] in updated for f in chapter_files)
+        tag += f'<span class="cupd" title="Changed since {esc(since)}">Updated</span>' if changed else ""
         rows = "".join(file_row(f) for f in chapter_files)
         sections.append(f"""
 <div class="chapter" id="ch-{number}" data-files="{esc(json.dumps(chapter['files']))}">
@@ -868,7 +901,8 @@ def render(args):
     labels = {path: chapter.get("label") for chapter in chapters for path in chapter["files"]}
     diff_tab = (f'<div class="files"><div class="files-head">Files <span>{len(ordered)}</span></div>'
                 f'<div class="files-grid">{"".join(file_row(f) for f in ordered)}</div></div>'
-                + "".join(file_card(f, "d", "Generated" if labels.get(f["path"]) == "generated" else None) for f in ordered))
+                + "".join(file_card(f, "d", "Generated" if labels.get(f["path"]) == "generated" else None, stamp(f["path"]))
+                   for f in ordered))
     body = prose(meta.get("body") or "") or '<span class="muted">No description.</span>'
     avatar = (f'<img class="av" src="https://github.com/{esc(meta["login"])}.png?size=40" alt="">'
               if meta.get("login") else f'<span class="av">{esc((meta.get("author") or "?")[:1].upper())}</span>')
@@ -885,7 +919,7 @@ def render(args):
         "{{NUMBER}}": number, "{{HEAD}}": esc(short(meta.get("head"))), "{{CREATED}}": esc(meta.get("created_at") or ""), "{{OPEN_PR}}": open_pr,
         "{{GUIDE}}": "".join(sections), "{{DIFF}}": diff_tab, "{{BODY}}": body,
         "{{BRANCH}}": esc(f"{meta.get('base_ref')} ← {meta.get('head_ref')}"), "{{FILES}}": str(len(files)),
-        "{{KEY}}": esc(f"review-guide:{meta.get('repo')}:{meta.get('number') or meta.get('head_ref')}:{meta.get('head')}"),
+        "{{KEY}}": esc(f"review-guide:{meta.get('repo')}:{meta.get('number') or meta.get('head_ref')}"),
     }
     page = re.sub(r"\{\{[A-Z_]+\}\}", lambda match: replacements.get(match[0], match[0]), page)
     out = directory / "review-guide.html"
@@ -896,7 +930,8 @@ def render(args):
     if (directory / "diff.patch").exists():
         (directory / "rendered.patch").write_text((directory / "diff.patch").read_text())
     (directory / "rendered.json").write_text(json.dumps(
-        {"head": meta.get("head"), "files": {path: fingerprint(file) for path, file in files.items()}}))
+        {"head": meta.get("head"), "files": {path: fingerprint(file) for path, file in files.items()},
+         "baseline": baseline}))
     print(out)
 
 
