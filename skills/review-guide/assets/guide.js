@@ -41,13 +41,24 @@
     sync();
   }
 
-  function goToFile(path) {
+  function goToFile(path, line, side) {
     const card = $$(".file[data-path]", activeTab()).find((item) => item.dataset.path === path)
       || $$(".file[data-path]").find((item) => item.dataset.path === path);
     if (!card) return;
     if (card.closest(".tab").hidden) showTab(card.closest(".tab").dataset.tab);
     expand(card);
-    card.scrollIntoView({ block: "start", behavior: "smooth" });
+    const rows = $$(".r", card).filter((row) => $(".ln", row)?.textContent === String(line));
+    const row = rows.find((item) => item.classList.contains("del") === (side === "old")) || rows[0];
+    if (!line || !row) return card.scrollIntoView({ block: "start", behavior: "smooth" });
+    const hidden = row.closest(".hid");
+    if (hidden && !hidden.classList.contains("open")) {
+      hidden.classList.add("open");
+      hidden.previousElementSibling?.classList.contains("gap") && hidden.previousElementSibling.remove();
+    }
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    $$(".r.flash").forEach((item) => item.classList.remove("flash"));
+    void row.offsetWidth;
+    row.classList.add("flash");
   }
 
   function showTab(name) {
@@ -84,10 +95,11 @@
       event.preventDefault();
       return goToFile(row.dataset.path);
     }
+    if (target.closest("a.ref, a.dref")) return;
     const jump = target.closest("[data-goto-file]");
     if (jump) {
       event.preventDefault();
-      return goToFile(jump.dataset.gotoFile);
+      return goToFile(jump.dataset.gotoFile, jump.dataset.line, jump.dataset.side);
     }
     const copy = target.closest("[data-copy]");
     if (copy) {

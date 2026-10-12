@@ -24,10 +24,12 @@ reads it top to bottom understands the change faster than they would from the di
 the view ("call tree", "flow"); usually omit it. Two kinds:
 
 - **Tree** (default). `lines`: `{ "op": "-" | "+" (omit for context), "depth": 0.., "text": "...", "note": "muted aside",
-  "ref": 3 }`. An integer `ref` renders as a boxed `03` linking to that chapter. The card header counts `+` and `-`
-  lines.
+  "ref": 3, "at": "load-blob.ts:42" }`. An integer `ref` renders as a boxed `03` linking to that chapter. `at` renders as
+  a muted `load-blob.ts 42` that opens that exact line of the diff and highlights it; use the new line number for `+`
+  and context lines and the old one for `-` lines (render rejects a line that is not in the diff). The file part may be
+  any unique path suffix. The card header counts `+` and `-` lines.
 - **Diagram** (rare): `{ "kind": "diagram", "caption": "...", "nodes": [ { "id": "a", "text": "takeShare()", "type":
-  "new | removed | decision | plain", "tag": "optional, e.g. New · step.ts", "ref": 1 } ], "rows": [["a", "b"], ["c"]],
+  "new | removed | decision | plain", "tag": "optional, e.g. New · step.ts", "ref": 1, "at": "optional file:line" } ], "rows": [["a", "b"], ["c"]],
   "edges": [ { "from": "b", "to": "c", "label": "files" } ] }`. `rows` place nodes on a grid of lanes (`null` leaves a
   cell empty); the page draws rounded wires that wrap from the end of one row to the start of the next. Without a `tag`,
   new and removed nodes render as one line with a `+` / `−` and a tinted fill, like Capy's launch demo.
@@ -90,7 +92,8 @@ borrowed the title from. Write it like a good PR title.
 - `-` lines are what the old path did; `+` lines are what it does now. Unchanged calls stay as context so the reader
   sees where the change sits.
 - Put the meaning in `note`, in plain words, on the changed lines ("a cached failure was returned for the rest of the
-  session"). Every `+` and `-` line gets the `ref` of the chapter that implements it.
+  session"). Every `+` and `-` line gets the `ref` of the chapter that implements it and an `at` pointing at the line
+  that does it, so a click opens that code.
 - 4–12 lines. If it needs more, the path is too broad; show the one a reviewer most needs.
 
 **Default to the tree**; a weak diagram is worse than none. Draw a diagram only when all of these hold:
@@ -137,10 +140,10 @@ borrowed the title from. Write it like a good PR title.
       "caption": "How a blob read reaches the network",
       "lines": [
         { "text": "loadBlob(path)" },
-        { "op": "-", "depth": 1, "text": "blobCache.get(path)", "note": "a cached failure was returned for the rest of the session", "ref": 1 },
-        { "op": "+", "depth": 1, "text": "withRetry(() => fetchBlob(path))", "note": "backs off and tries again on a network error", "ref": 1 },
+        { "op": "-", "depth": 1, "text": "blobCache.get(path)", "note": "a cached failure was returned for the rest of the session", "ref": 1, "at": "load-blob.ts:18" },
+        { "op": "+", "depth": 1, "text": "withRetry(() => fetchBlob(path))", "note": "backs off and tries again on a network error", "ref": 1, "at": "load-blob.ts:21" },
         { "depth": 2, "text": "fetchBlob(path)" },
-        { "op": "+", "depth": 1, "text": "patchText(previous, next)", "note": "built from the fresh read", "ref": 2 },
+        { "op": "+", "depth": 1, "text": "patchText(previous, next)", "note": "built from the fresh read", "ref": 2, "at": "patch-text.ts:9" },
         { "depth": 1, "text": "manifest.record(path, attempt)" }
       ]
     }

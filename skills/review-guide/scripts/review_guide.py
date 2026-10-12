@@ -636,7 +636,22 @@ def prose(text):
     return "".join(f"<code>{esc(p)}</code>" if i % 2 else esc(p) for i, p in enumerate(parts))
 
 
-def tree_block(block, chapters):
+def resolve_at(at, files):
+    """Map "path:line" (full path or a unique suffix such as "step.ts:700") to (path, line)."""
+    match = re.fullmatch(r"(.+):(\d+)", str(at or "").strip())
+    if not match:
+        return None
+    paths = [path for path in files if path == match[1] or path.endswith("/" + match[1])]
+    return (paths[0], int(match[2])) if len(paths) == 1 else None
+
+
+def at_attrs(at, files, removed=False):
+    target = resolve_at(at, files)
+    side = ' data-side="old"' if removed else ""
+    return f' data-goto-file="{esc(target[0])}" data-line="{target[1]}"{side}' if target else ""
+
+
+def tree_block(block, chapters, files):
     rows, plus, minus = [], 0, 0
     for line in block.get("lines", []):
         op = line.get("op", " ")
@@ -650,8 +665,12 @@ def tree_block(block, chapters):
             ref_html = f'<span class="ref">{esc(str(ref))}</span>' if ref else '<span class="ref"></span>'
         note = f' <span class="tnote">{esc(line["note"])}</span>' if line.get("note") else ""
         pad = int(line.get("depth", 0)) * 2
+        target = resolve_at(line.get("at"), files)
+        at_html = (f'<a class="at" href="#"{at_attrs(line["at"], files, op == "-")}>{esc(split_path(target[0])[0])} {target[1]}</a>'
+                   if target else "")
         rows.append(f'<div class="tr {kind}"><span class="sg">{"" if op == " " else op}</span>'
-                    f'<span class="tt" style="--d:{pad}ch">{esc(line["text"].replace("`", ""))}{note}</span>{ref_html}</div>')
+                    f'<span class="tt" style="--d:{pad}ch">{esc(line["text"].replace("`", ""))}{note}</span>'
+                    f'<span class="tend">{at_html}{ref_html}</span></div>')
     return "".join(rows), plus, minus
 
 
@@ -659,7 +678,7 @@ BRANCH_ICON = ("<span class='dicon'><svg viewBox='0 0 16 16'><circle cx='4' cy='
                "<circle cx='12' cy='12' r='1.5'/><path d='M5.5 8h2.5M8 8V5.5a1.5 1.5 0 0 1 1.5-1.5h1M8 8v2.5a1.5 1.5 0 0 0 1.5 1.5h1'/></svg></span>")
 
 
-def diagram_block(block, chapters):
+def diagram_block(block, chapters, files):
     """Capy-style flow: nodes on a grid of lanes; guide.js draws the rounded orthogonal wires between them."""
     nodes = {node["id"]: node for node in block["nodes"]}
     columns = max(len(row) for row in block["rows"])
@@ -677,7 +696,8 @@ def diagram_block(block, chapters):
             sign = {"new": "+", "removed": "−"}.get(kind, "") if not tag else ""
             ref = f'<a class="dref" href="#ch-{node["ref"]}">{node["ref"]:02d}</a>' if isinstance(node.get("ref"), int) else ""
             cells.append(
-                f'<div class="dcell"><div class="dnode {esc(kind)}{"" if tag else " flat"}" data-id="{esc(node_id)}">'
+                f'<div class="dcell"><div class="dnode {esc(kind)}{"" if tag else " flat"}" data-id="{esc(node_id)}"'
+                f'{at_attrs(node.get("at"), files, kind == "removed")}>'
                 f'{BRANCH_ICON if kind == "decision" else ""}<div class="dbody">'
                 f'{f"<div class=dtag>{dot}{esc(tag)}</div>" if tag else ""}'
                 f'<div class="dtext">{f"<b>{sign}</b>" if sign else ""}{esc(node.get("text", "").replace("`", ""))}</div></div>{ref}</div></div>')
@@ -704,16 +724,16 @@ def validate_diagram(block):
     return errors
 
 
-def before_after(blocks, chapters):
+def before_after(blocks, chapters, files):
     cards = []
     for block in blocks:
         if block.get("kind") == "diagram":
-            body, plus, minus = diagram_block(block, chapters), 0, 0
+            body, plus, minus = diagram_block(block, chapters, files), 0, 0
             plus = sum(n.get("type") == "new" for n in block.get("nodes", []))
             minus = sum(n.get("type") == "removed" for n in block.get("nodes", []))
             body = f'<div class="bac">{esc(block.get("caption", ""))}</div>{body}'
         else:
-            rows, plus, minus = tree_block(block, chapters)
+            rows, plus, minus = tree_block(block, chapters, files)
             body = f'<div class="bac">{esc(block.get("caption", ""))}</div><div class="tree">{rows}</div>'
         tag = f'<span class="bal">{esc(block["label"])}</span>' if block.get("label") else ""
         cards.append(f"""
@@ -750,6 +770,7 @@ def validate(data, guide):
     errors = []
     paths = [f["path"] for f in data["files"]]
     tests = {f["path"] for f in data["files"] if f["label"] == "tests"}
+    by_path = {f["path"]: f for f in data["files"]}
     seen = {}
     if not guide.get("overview", {}).get("summary"):
         errors.append("overview.summary is required")
@@ -784,6 +805,15 @@ def validate(data, guide):
                 errors.append(f"before/after ref {ref} does not match a chapter")
         if block.get("kind") == "diagram":
             errors.extend(validate_diagram(block))
+        for item in block.get("lines", []) + block.get("nodes", []):
+            if "at" not in item:
+                continue
+            target = resolve_at(item["at"], by_path)
+            if not target:
+                errors.append(f"before/after at '{item['at']}' must be 'path:line' naming exactly one changed file")
+            elif not any(target[1] in (line.get("n"), line.get("o"))
+                         for hunk in by_path[target[0]]["hunks"] for line in hunk["lines"]):
+                errors.append(f"before/after at '{item['at']}': line {target[1]} is not in that file's diff")
     return errors
 
 
@@ -814,7 +844,7 @@ def render(args):
     <h2>Overview</h2>
     <p class="desc">{prose(overview['summary'])}</p>{f'<ol class="steps">{steps}</ol>' if steps else ''}{tests_note}
   </div>
-  <div class="right">{before_after(blocks, chapters)}</div>
+  <div class="right">{before_after(blocks, chapters, files)}</div>
 </div>"""]
     for number, chapter in enumerate(chapters, 1):
         label = chapter.get("label")
