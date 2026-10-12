@@ -1,6 +1,6 @@
 # Shared agent skills
 
-Private source of truth for Surge's 15 enabled personal skills and coding defaults on the
+Private source of truth for Surge's 16 enabled personal skills and coding defaults on the
 MacBook Pro and Mac mini. Codex and Claude use links to the same checkout.
 
 ## Current setup
@@ -9,8 +9,8 @@ Both devices use `~/.agents/skill-config` as their checkout:
 
 | Device | Codex | Claude Code |
 | --- | --- | --- |
-| MacBook Pro | 15 enabled personal skills | The same 15 personal skills |
-| Mac mini | 15 enabled personal skills | The same 15 personal skills |
+| MacBook Pro | 16 enabled personal skills | The same 16 personal skills |
+| Mac mini | 16 enabled personal skills | The same 16 personal skills |
 
 Both providers also share `surge-defaults.md`. Sync is manual: changes reach
 another device after you push them to GitHub and run the sync command there.
@@ -27,6 +27,7 @@ another device after you push them to GitHub and run the sync command there.
 - `karpathy-guidelines` — simple, focused coding
 - `reflect` — examine and improve skills and tooling
 - `retro` — learn from completed work
+- `review-guide` — Capy-style guided review page for a change
 - `ship` — commit, push and follow PR work
 - `surge-mode` — apply Surge's working style
 - `swarm` — parallel independent work
@@ -162,7 +163,7 @@ cd ~/.agents/skill-config
 python3 -m unittest discover -s tests
 ```
 
-The checker verifies skill names/descriptions, all 49 managed links and every
+The checker verifies skill names/descriptions, all 52 managed links and every
 managed Codex discovery setting. Tests cover repeat installation, backups,
 cleanup of removed skills, preservation of unrelated configuration and refusal
 to pull over local edits.

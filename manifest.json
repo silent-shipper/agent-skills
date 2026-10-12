@@ -42,6 +42,10 @@
       "codex_enabled": true
     },
     {
+      "name": "review-guide",
+      "codex_enabled": true
+    },
+    {
       "name": "ship",
       "codex_enabled": true
     },

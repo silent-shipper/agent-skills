@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}} · Guide</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem("review-guide-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")</script>
+<style>{{CSS}}</style>
+</head>
+<body data-key="{{KEY}}">
+<div class="top">
+  <div class="crumbs">
+    <span class="muted">Pull requests</span>
+    <svg class="crumb-sep" viewBox="0 0 16 16"><path d="M6 4l4 4-4 4"/></svg>
+    <svg class="pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="12.5" r="1.6"/><path d="M4 5.1v5.8M12 10.9V7a2.5 2.5 0 0 0-2.5-2.5H7M8.5 3 7 4.5 8.5 6"/></svg>
+    <span class="ctitle" title="{{BRANCH}}">{{TITLE}}</span><span class="fcount">{{COUNTS}}</span>
+    <span class="sp"></span>
+    <button class="icon" id="theme" title="Toggle theme"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11a5.5 5.5 0 0 0 0-11z" class="fill"/></svg></button>
+  </div>
+  <div class="toolbar">
+    <div class="tabs">
+      <button data-tab="overview">Overview</button>
+      <button data-tab="guide" class="on">Guide</button>
+      <button data-tab="diff">Diff</button>
+    </div>
+    <span class="sp"></span>
+    <button class="icon" id="collapse" title="Collapse all files"><svg viewBox="0 0 16 16"><path d="M5 2.5l3 3 3-3M5 13.5l3-3 3 3"/></svg></button>
+    <span class="btn ghost" id="progress"></span>
+    {{OPEN_PR}}
+  </div>
+</div>
+<main>
+  <header class="head">
+    <h1>{{TITLE}}</h1>
+    <div class="meta">{{AVATAR}}<span class="author">{{AUTHOR}}</span>{{NUMBER}}<span class="sep"></span><time data-created="{{CREATED}}"></time><span class="sep"></span><span>written for {{HEAD}}</span></div>
+  </header>
+  <div class="tab" data-tab="guide">{{GUIDE}}</div>
+  <div class="tab" data-tab="diff" hidden><div class="difflist">{{DIFF}}</div></div>
+  <div class="tab" data-tab="overview" hidden>
+    <div class="prbody">{{BODY}}</div>
+    <div class="prfoot">{{BRANCH}} · {{FILES}} files</div>
+  </div>
+</main>
+<script>{{JS}}</script>
+</body>
+</html>
