@@ -1,0 +1,6 @@
+interface:
+  display_name: "Architect"
+  short_description: "Design boundaries before implementation"
+  default_prompt: "Use $architect to design this boundary-crossing change before implementing it."
+policy:
+  allow_implicit_invocation: true

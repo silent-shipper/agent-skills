@@ -1,0 +1,6 @@
+interface:
+  display_name: "Interrogate"
+  short_description: "Adversarial multi-reviewer verdict"
+  default_prompt: "Use $interrogate to adversarially review this change and synthesize a read-only verdict."
+policy:
+  allow_implicit_invocation: true

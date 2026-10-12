@@ -1,0 +1,4 @@
+interface:
+  display_name: "Surge Mode"
+  short_description: "Surge's working preferences and workflow routing"
+  default_prompt: "Use $surge-mode to handle this task in Surge's working style."

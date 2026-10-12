@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "name": "architect",
+      "codex_enabled": true
+    },
+    {
+      "name": "arena",
+      "codex_enabled": true
+    },
+    {
+      "name": "breakdown",
+      "codex_enabled": true
+    },
+    {
+      "name": "create-verification",
+      "codex_enabled": true
+    },
+    {
+      "name": "develop-web-game",
+      "codex_enabled": false
+    },
+    {
+      "name": "frontend-code-review",
+      "codex_enabled": false
+    },
+    {
+      "name": "grill-to-goal",
+      "codex_enabled": true
+    },
+    {
+      "name": "grill-to-issue",
+      "codex_enabled": false
+    },
+    {
+      "name": "improve-codebase-architecture",
+      "codex_enabled": true
+    },
+    {
+      "name": "interrogate",
+      "codex_enabled": true
+    },
+    {
+      "name": "investigate",
+      "codex_enabled": false
+    },
+    {
+      "name": "karpathy-guidelines",
+      "codex_enabled": true
+    },
+    {
+      "name": "one-pager",
+      "codex_enabled": false
+    },
+    {
+      "name": "presentation",
+      "codex_enabled": false
+    },
+    {
+      "name": "react-doctor",
+      "codex_enabled": false
+    },
+    {
+      "name": "refactor-pass",
+      "codex_enabled": false
+    },
+    {
+      "name": "reflect",
+      "codex_enabled": true
+    },
+    {
+      "name": "retro",
+      "codex_enabled": true
+    },
+    {
+      "name": "ship",
+      "codex_enabled": true
+    },
+    {
+      "name": "show-me",
+      "codex_enabled": false
+    },
+    {
+      "name": "surge-mode",
+      "codex_enabled": true
+    },
+    {
+      "name": "swarm",
+      "codex_enabled": true
+    },
+    {
+      "name": "takeover-pr",
+      "codex_enabled": false
+    },
+    {
+      "name": "test-defuse",
+      "codex_enabled": false
+    },
+    {
+      "name": "thermo-nuclear-code-quality-review",
+      "codex_enabled": true
+    },
+    {
+      "name": "triple-review",
+      "codex_enabled": false
+    },
+    {
+      "name": "worktree-dev",
+      "codex_enabled": true
+    },
+    {
+      "name": "write-essay",
+      "codex_enabled": false
+    }
+  ]
+}

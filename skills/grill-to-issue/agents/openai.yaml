@@ -1,0 +1,4 @@
+interface:
+  display_name: "Grill to Issue"
+  short_description: "Draft clear issue briefs in private Notion"
+  default_prompt: "Use $grill-to-issue to turn this roadmap item into a private Notion issue-draft one-pager."

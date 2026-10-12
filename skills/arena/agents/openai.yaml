@@ -1,0 +1,6 @@
+interface:
+  display_name: "Arena"
+  short_description: "Compare and synthesize parallel attempts"
+  default_prompt: "Use $arena to generate independent candidates for this task and synthesize the strongest result."
+policy:
+  allow_implicit_invocation: true
