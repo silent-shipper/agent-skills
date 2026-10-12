@@ -1,6 +1,9 @@
 import contextlib
 import io
+import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -107,6 +110,37 @@ class SkillInstallationTests(unittest.TestCase):
         self.assertEqual(len(backups), 1)
         self.assertTrue(backups[0].is_symlink())
         skills.install()
+
+    def test_sync_runs_the_installer_from_the_pulled_revision(self):
+        origin = Path(self.directory.name) / 'origin'
+        checkout = self.home / '.agents/skill-config'
+        origin.mkdir()
+        (origin / 'scripts').mkdir()
+        shutil.copy2(skills.REPO / 'scripts/skills.py', origin / 'scripts/skills.py')
+        shutil.copy2(skills.REPO / 'scripts/check-skills.py', origin / 'scripts/check-skills.py')
+        shutil.copytree(skills.REPO / 'skills/architect', origin / 'skills/architect')
+        (origin / 'manifest.json').write_text(json.dumps({'version': 1, 'skills': [{'name': 'architect', 'codex_enabled': True}]}))
+        (origin / 'surge-defaults.md').write_text('Shared defaults\n')
+        (origin / '.gitignore').write_text('__pycache__/\n')
+        def git(*args):
+            subprocess.run(['git', '-C', str(origin), *args], check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        git('init', '-b', 'main')
+        git('config', 'user.name', 'Skill config tests')
+        git('config', 'user.email', 'tests@example.invalid')
+        git('add', '.')
+        git('commit', '-m', 'Initial installer')
+        subprocess.run(['git', 'clone', '-q', str(origin), str(checkout)], check=True)
+        script = origin / 'scripts/skills.py'
+        script.write_text(script.read_text().replace('def install():\n',
+            'def install():\n    (HOME_DIR / "pulled-installer-ran").write_text("new revision")\n'))
+        git('add', '.')
+        git('commit', '-m', 'Update installer')
+        result = subprocess.run([sys.executable, str(checkout / 'scripts/skills.py'), 'sync'],
+                                env={'HOME': str(self.home), 'PATH': os.environ['PATH']},
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.home / 'pulled-installer-ran').read_text(), 'new revision')
 
 
 if __name__ == "__main__":

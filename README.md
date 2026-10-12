@@ -71,7 +71,7 @@ skill list. There is no automatic pull job installed on either Mac.
 To sync the Mac mini from the MacBook Pro, with Tailscale connected and SSH access:
 
 ```sh
-ssh surge@surges-mac-mini.tail5f24e1.ts.net \
+ssh surge@100.108.123.39 \
   'export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH; python3 ~/.agents/skill-config/scripts/skills.py sync && python3 ~/.agents/check-skills.py'
 ```
 

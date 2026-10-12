@@ -142,7 +142,7 @@ def sync():
     if run("git", "-C", str(REPO), "status", "--porcelain"):
         raise SystemExit("Local edits exist; commit and push them before syncing.")
     run("git", "-C", str(REPO), "pull", "--ff-only")
-    install()
+    os.execv(sys.executable, [sys.executable, str(REPO / "scripts/skills.py"), "install"])
 
 
 def auto_sync():
