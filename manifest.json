@@ -10,6 +10,10 @@
       "codex_enabled": true
     },
     {
+      "name": "benchmark-checklist",
+      "codex_enabled": true
+    },
+    {
       "name": "breakdown",
       "codex_enabled": true
     },
@@ -19,6 +23,10 @@
     },
     {
       "name": "grill-to-goal",
+      "codex_enabled": true
+    },
+    {
+      "name": "how",
       "codex_enabled": true
     },
     {
@@ -35,6 +43,10 @@
     },
     {
       "name": "reflect",
+      "codex_enabled": true
+    },
+    {
+      "name": "remote-session",
       "codex_enabled": true
     },
     {
@@ -59,10 +71,6 @@
     },
     {
       "name": "thermo-nuclear-code-quality-review",
-      "codex_enabled": true
-    },
-    {
-      "name": "worktree-dev",
       "codex_enabled": true
     }
   ]

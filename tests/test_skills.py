@@ -80,6 +80,77 @@ class SkillInstallationTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "Local edits exist"):
                 skills.sync()
         self.assertEqual((repo / "local-edit").read_text(), "Keep my edit\n")
+        state = json.loads((self.home / '.agents/skill-sync-status.json').read_text())
+        self.assertEqual(state['status'], 'blocked')
+        self.assertIn('Local edits', state['reason'])
+
+    def test_checker_catches_body_references_but_ignores_examples(self):
+        repo = Path(self.directory.name) / 'reference-repo'
+        (repo / 'skills/example').mkdir(parents=True)
+        path = repo / 'skills/example/SKILL.md'
+        path.write_text('A real [reference](missing.md).\n```md\n[Example](not-a-file.md)\n```\n')
+        with patch.object(skills, 'REPO', repo):
+            self.assertEqual(skills.reference_errors([{'name': 'example'}]),
+                             ['Missing reference: skills/example/SKILL.md -> missing.md'])
+            (path.parent / 'missing.md').write_text('Target\n')
+            self.assertEqual(skills.reference_errors([{'name': 'example'}]), [])
+
+    def test_optional_claude_alt_gets_skills_and_defaults_without_credentials(self):
+        alt = self.home / '.claude-alt'
+        alt.mkdir()
+        credentials = alt / '.credentials.json'
+        credentials.write_text('private existing data\n')
+        skills.install()
+        self.assertEqual((alt / 'skills/how').resolve(), skills.REPO / 'skills/how')
+        self.assertEqual((alt / 'CLAUDE.md').resolve(), skills.REPO / 'surge-defaults.md')
+        self.assertEqual(credentials.read_text(), 'private existing data\n')
+        skills.check()
+
+    def test_toolkit_resolution_is_host_local_and_explicit_selection_is_validated(self):
+        def toolkit(path):
+            (path / 'docs').mkdir(parents=True)
+            (path / 'package.json').write_text(json.dumps({'scripts': {'queue': 'node queue', 'verify:app': 'node verify'}}))
+            (path / 'docs/prompt-verification.md').write_text('Guide\n')
+        laptop = self.home / 'Desktop/Projects/metamask-e2e'
+        mini = self.home / 'Projects/metamask-e2e'
+        with patch.dict(os.environ, {}, clear=True):
+            toolkit(laptop)
+            self.assertEqual(skills.toolkit_root(), laptop.resolve())
+            toolkit(mini)
+            with self.assertRaisesRegex(ValueError, '2 valid roots'):
+                skills.toolkit_root()
+            with patch.dict(os.environ, {'METAMASK_E2E_ROOT': str(mini)}):
+                self.assertEqual(skills.toolkit_root(), mini.resolve())
+            with patch.dict(os.environ, {'METAMASK_E2E_ROOT': str(self.home / 'missing')}):
+                with self.assertRaisesRegex(ValueError, '0 valid roots'):
+                    skills.toolkit_root()
+
+    def test_installed_receipt_records_content_identity(self):
+        skills.install()
+        state = json.loads((self.home / '.agents/skill-sync-status.json').read_text())
+        self.assertEqual(state['status'], 'installed')
+        self.assertEqual(state['skill_sha256']['how'], skills.digest(skills.REPO / 'skills/how/SKILL.md'))
+        self.assertEqual(state['manifest_sha256'], skills.digest(skills.REPO / 'manifest.json'))
+
+    def test_source_identity_detects_reference_changes_without_a_git_head(self):
+        repo = Path(self.directory.name) / 'identity-repo'
+        (repo / 'skills/example').mkdir(parents=True)
+        target = repo / 'skills/example/reference.md'
+        target.write_text('First version\n')
+        with patch.object(skills, 'REPO', repo):
+            first = skills.identity()['source_sha256']
+            target.write_text('Second version\n')
+            self.assertNotEqual(skills.identity()['source_sha256'], first)
+
+    def test_auto_sync_uses_a_user_domain_without_a_gui_session(self):
+        import plistlib
+        with patch.object(skills.os, 'getuid', return_value=501), \
+             patch.object(skills.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1)), \
+             patch.object(skills, 'run') as command:
+            skills.auto_sync()
+        config = self.home / 'Library/LaunchAgents' / (skills.LABEL + '.plist')
+        self.assertEqual(plistlib.loads(config.read_bytes())['StartInterval'], 300)
+        command.assert_called_once_with('launchctl', 'bootstrap', 'user/501', str(config))
 
     def test_removed_skills_are_unlinked_and_unmanaged_skills_are_preserved(self):
         skills.install()

@@ -2,6 +2,7 @@
 """Install, verify, or pull Surge's shared personal skills."""
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ import re
 import subprocess
 import sys
 from datetime import datetime
+from urllib.parse import unquote, urlsplit
 
 REPO = Path(__file__).resolve().parent.parent
 HOME_DIR = Path.home().resolve()
@@ -17,8 +19,78 @@ LABEL = "com.silent-shipper.agent-skills"
 ROOTS = (".agents/skills", ".codex/skills", ".claude/skills")
 
 
-def run(*args):
-    return subprocess.check_output(args, text=True, timeout=90).strip()
+def roots():
+    return ROOTS + ((".claude-alt/skills",) if (HOME_DIR / ".claude-alt").is_dir() else ())
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def reference_errors(skills):
+    errors = []
+    for skill in skills:
+        for path in (REPO / "skills" / skill["name"]).rglob("*.md"):
+            text = re.sub(r"(?ms)^\s*(`{3,}|~{3,}).*?^\s*\1\s*$", "", path.read_text())
+            for target in re.findall(r"\]\(([^)]+)\)", text):
+                target = target.strip().split(" ", 1)[0].strip("<>")
+                parsed = urlsplit(target)
+                if parsed.scheme or not parsed.path or parsed.path.startswith("/") or "$" in target:
+                    continue
+                if not (path.parent / unquote(parsed.path)).exists():
+                    errors.append("Missing reference: " + str(path.relative_to(REPO)) + " -> " + target)
+    return errors
+
+
+def toolkit_root():
+    configured = os.environ.get("METAMASK_E2E_ROOT")
+    candidates = [Path(configured).expanduser()] if configured else [
+        HOME_DIR / "Desktop/Projects/metamask-e2e", HOME_DIR / "Projects/metamask-e2e"]
+    valid = []
+    for path in candidates:
+        try:
+            package = json.loads((path / "package.json").read_text())
+            scripts = package.get("scripts") if isinstance(package, dict) else None
+            if isinstance(scripts, dict) and all(name in scripts for name in ("queue", "verify:app")) and (path / "docs/prompt-verification.md").is_file():
+                valid.append(path.resolve())
+        except (OSError, ValueError):
+            continue
+    valid = sorted(set(valid))
+    if len(valid) != 1:
+        raise ValueError("Set METAMASK_E2E_ROOT to the intended toolkit checkout with queue/verify:app scripts and docs/prompt-verification.md; found " + str(len(valid)) + " valid roots.")
+    return valid[0]
+
+
+def identity():
+    try:
+        head = run("git", "-C", str(REPO), "rev-parse", "HEAD", quiet=True)
+        dirty = run("git", "-C", str(REPO), "status", "--porcelain", quiet=True).splitlines()
+    except subprocess.CalledProcessError:
+        head, dirty = None, []
+    source = hashlib.sha256()
+    for path in sorted(REPO.rglob("*")):
+        relative = path.relative_to(REPO)
+        if not path.is_file() or relative.parts[0] not in ("skills", "scripts", "manifest.json", "surge-defaults.md") or "__pycache__" in relative.parts or path.suffix == ".pyc":
+            continue
+        source.update(str(relative).encode() + b"\0" + hashlib.sha256(path.read_bytes()).digest())
+    return {"repo_head": head, "dirty_files": dirty, "source_sha256": source.hexdigest(), "manifest_sha256": digest(REPO / "manifest.json") if (REPO / "manifest.json").is_file() else None,
+            "skill_sha256": {s["name"]: digest(REPO / "skills" / s["name"] / "SKILL.md") for s in (manifest() if (REPO / "manifest.json").is_file() else [])}}
+
+
+def record_status(status, reason=None):
+    path = HOME_DIR / ".agents/skill-sync-status.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = {"status": status, "at": datetime.now().astimezone().isoformat(), **identity()}
+    if reason:
+        data["reason"] = reason
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(data, indent=2) + "\n")
+    temporary.replace(path)
+
+
+def run(*args, quiet=False):
+    return subprocess.check_output(args, text=True, timeout=90,
+                                   stderr=subprocess.DEVNULL if quiet else None).strip()
 
 
 def manifest():
@@ -41,7 +113,7 @@ def manifest():
 def retired_links(skills):
     names = {skill["name"] for skill in skills}
     paths = []
-    for root in ROOTS:
+    for root in roots():
         directory = HOME_DIR / root
         for path in directory.iterdir() if directory.exists() else ():
             if path.is_symlink() and path.name not in names:
@@ -55,11 +127,13 @@ def managed_paths(skills):
     paths = {}
     for skill in skills:
         name = skill["name"]
-        for root in ROOTS:
+        for root in roots():
             paths[HOME_DIR / root / name] = REPO / "skills" / name
     for path in (".agents/surge-defaults.md", ".codex/AGENTS.md", ".claude/CLAUDE.md"):
         paths[HOME_DIR / path] = REPO / "surge-defaults.md"
     paths[HOME_DIR / ".agents/check-skills.py"] = REPO / "scripts/check-skills.py"
+    if (HOME_DIR / ".claude-alt").is_dir():
+        paths[HOME_DIR / ".claude-alt/CLAUDE.md"] = REPO / "surge-defaults.md"
     return paths
 
 
@@ -73,7 +147,7 @@ def configured(text):
 
 def skill_config(text, skills, retired=()):
     names = {s["name"] for s in skills} | {path.name for path in retired}
-    known = {str(HOME_DIR / root / name / "SKILL.md") for root in ROOTS for name in names}
+    known = {str(HOME_DIR / root / name / "SKILL.md") for root in roots() for name in names}
     known.update(str(REPO / "skills" / name / "SKILL.md") for name in names)
     for match, path, _ in reversed(list(configured(text))):
         if str(path) in known:
@@ -114,14 +188,19 @@ def install():
         temporary.write_text(new)
         temporary.chmod(0o600)
         temporary.replace(config)
-    check()
+    try:
+        check()
+    except SystemExit:
+        record_status("blocked", "Installed skill checks failed; run check for the exact errors.")
+        raise
+    record_status("installed")
     if directory.exists():
         print("Backups:", directory)
 
 
 def check():
     skills = manifest()
-    errors = ["Retired skill still linked: " + str(path) for path in retired_links(skills)]
+    errors = reference_errors(skills) + ["Retired skill still linked: " + str(path) for path in retired_links(skills)]
     for path, target in managed_paths(skills).items():
         if not path.is_symlink() or path.resolve() != target or not target.exists():
             errors.append("Invalid link: " + str(path))
@@ -132,16 +211,32 @@ def check():
         values = [enabled for _, path, enabled in entries if path and path.resolve() == source]
         if values != [skill["codex_enabled"]]:
             errors.append("Incorrect Codex discovery setting: " + skill["name"])
+    try:
+        toolkit = {"status": "ready", "root": str(toolkit_root())}
+    except ValueError as error:
+        toolkit = {"status": "unconfigured", "remedy": str(error)}
+    status_path = HOME_DIR / ".agents/skill-sync-status.json"
+    try:
+        last_sync = json.loads(status_path.read_text())
+    except (OSError, ValueError):
+        last_sync = None
     print(json.dumps({"status": "FAIL" if errors else "PASS", "skills_checked": len(skills),
-                      "links_checked": len(managed_paths(skills)), "errors": errors}, indent=2))
+                      "links_checked": len(managed_paths(skills)), "errors": errors, **identity(),
+                      "toolkits": {"metamask-e2e": toolkit}, "last_sync": last_sync,
+                      "auto_sync_installed": (HOME_DIR / "Library/LaunchAgents" / (LABEL + ".plist")).is_file()}, indent=2))
     if errors:
         raise SystemExit(1)
 
 
 def sync():
     if run("git", "-C", str(REPO), "status", "--porcelain"):
+        record_status("blocked", "Local edits exist; commit and push them before syncing.")
         raise SystemExit("Local edits exist; commit and push them before syncing.")
-    run("git", "-C", str(REPO), "pull", "--ff-only")
+    try:
+        run("git", "-C", str(REPO), "pull", "--ff-only")
+    except subprocess.CalledProcessError as error:
+        record_status("blocked", "Git pull --ff-only failed; inspect authentication or divergent history.")
+        raise SystemExit("Git pull --ff-only failed; local work was not reset.") from error
     os.execv(sys.executable, [sys.executable, str(REPO / "scripts/skills.py"), "install"])
 
 
@@ -157,7 +252,9 @@ def auto_sync():
     if path.exists() and plistlib.loads(path.read_bytes()) != data:
         raise SystemExit("A different launch agent already exists: " + str(path))
     path.write_bytes(plistlib.dumps(data))
-    domain = "gui/" + str(os.getuid())
+    gui = "gui/" + str(os.getuid())
+    domain = gui if subprocess.run(["launchctl", "print", gui], stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL).returncode == 0 else "user/" + str(os.getuid())
     if subprocess.run(["launchctl", "print", domain + "/" + LABEL], stdout=subprocess.DEVNULL,
                       stderr=subprocess.DEVNULL).returncode:
         run("launchctl", "bootstrap", domain, str(path))
@@ -166,8 +263,14 @@ def auto_sync():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("install", "check", "sync", "enable-auto-sync"))
+    parser.add_argument("command", choices=("install", "check", "sync", "enable-auto-sync", "toolkit-root"))
     args = parser.parse_args()
+    if args.command == "toolkit-root":
+        try:
+            print(toolkit_root())
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
+        return
     (HOME_DIR / ".agents").mkdir(parents=True, exist_ok=True)
     with (HOME_DIR / ".agents/.skill-config.lock").open("a") as lock:
         try:

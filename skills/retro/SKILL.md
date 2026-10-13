@@ -22,7 +22,13 @@ The user has asked for a **retrospective**. You are suggesting improvements to t
 - **No-ops**: look for instructions in steering files that don't modify the agent's behavior. _Use when_ the steering files are large and unwieldy.
 - **Information access**: look for opportunities to increase the agent's access to information. Teeing dev server logs, readonly access to third-party services. _Use when_ a crucial piece of information was not available to the agent.
 
-4. Present candidates in order of impact. For each, cite the observed session problem, check the existing mechanism, name the proposed owner/change and explain how to verify improvement. Separate existing gaps from regressions introduced during the session. Suggest changes; apply them only when the user requests implementation.
+4. For a mistake class seen in at least two independent instances, try eliminating
+   the failure through ownership or data shape first, then types, lint/runtime
+   checks, and behavioral regression coverage. Reuse existing guards and prove a
+   new one rejects the real historical mistake. Keep documentation for judgments
+   a deterministic mechanism cannot enforce. Do not add a new rule for a one-off.
+
+5. Present candidates in order of impact. For each, cite the observed session problem, check the existing mechanism, name the proposed owner/change and explain how to verify improvement. Separate existing gaps from regressions introduced during the session. Suggest changes; apply them only when the user requests implementation.
 
 ## Reference
 
@@ -44,3 +50,5 @@ You have access to several files in the repo:
 - Skills: use skills for reusable workflows with precise triggers. Keep substantial conditional details in linked references.
 
 Adapted from [Matt Pocock's retro, v1.3.0](https://github.com/mattpocock/skills/blob/v1.3.0/skills/engineering/retro/SKILL.md). See [LICENSE](LICENSE).
+
+Structural correction ordering adapted from [pstack correct](https://github.com/cursor/plugins/blob/1dcc2bacde73ddd284803b7af28164d0436198fc/pstack/skills/correct/SKILL.md).

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Remote Session"
+  short_description: "Hand off worktree and context to remote T3"
+  default_prompt: "Use $remote-session to continue this session in the configured remote T3 environment."

@@ -20,6 +20,25 @@ basic completeness or repeatedly strip unnecessary complexity from the result.
 - Follow requested skills and verification steps. Disclose missing prerequisites
   and omitted steps. Do not silently substitute an easier task.
 
+## Route the work
+
+For a long task, record its class, requested endpoint, observable done predicate
+and proof in the existing task plan. Keep completed decisions and evidence there;
+refresh them only when inputs change. Small localized tasks need no extra ledger.
+
+- Read-only explanation: use `how`; return the answer without implementation.
+- Feature or bug: ground the affected flow, design only uncertain boundaries,
+  implement the smallest complete unit and prove its requested behavior.
+- Refactor: establish baseline parity and a concrete maintenance benefit.
+- Measured performance or reliability claim: use `benchmark-checklist`.
+- Review or shipping: use `interrogate` or `ship` for the requested endpoint.
+
+Reuse a suitable isolated checkout. A new independent task may start from the
+current default branch; PR fixes and dependent work use their actual target/base.
+Use the app's setup guidance. Managed verification owns server startup; start a
+caller-owned preview only when requested. Worktree creation is ordinary Git/T3
+setup and does not need a separate skill.
+
 ## Make the change worth its cost
 
 - Meet the full agreed scope with reuse, deletion, and fewer moving parts.

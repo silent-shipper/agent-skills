@@ -5,7 +5,17 @@ description: Verify Defuse changes with focused module tests and evidence-backed
 
 # Create Verification
 
-Use `/Users/surge/Desktop/Projects/metamask-e2e` as the personal browser tool.
+Resolve the existing personal toolkit on this host once:
+
+```bash
+VERIFY_TOOLKIT_ROOT="$(python3 ~/.agents/skill-config/scripts/skills.py toolkit-root)"
+```
+
+Stop if resolution fails. `METAMASK_E2E_ROOT` selects an explicit checkout when
+needed; otherwise the resolver checks the two installed Mac locations. Use the
+same resolved root for every command, guide, feature map and evidence path.
+The root check proves installed scripts and documentation, not external runner
+login or browser readiness; use the toolkit's doctor before queueing.
 Reuse its funded test account, configured wallet, credentials and ChatGPT connection.
 Funds are provided for real feature development and verification. The user has
 given standing authorization to spend from this dedicated test account; do not
@@ -93,10 +103,10 @@ behavioral change, have a focused reviewer check for omitted actions, surfaces
 and state transitions. Then write a feature charter with `goal`, immutable `requiredOutcomes`
 and action-specific `prerequisites`. Every outcome has an ID, evidence kind and
 exact expected hooks/values; bind lifecycle/UI checks to the same resource. Print a
-maintained example with `npm --prefix /Users/surge/Desktop/Projects/metamask-e2e run queue -- charter <feature-id>`
-(`charter --list` lists them), or author an arbitrary feature charter using the [prompt guide](/Users/surge/Desktop/Projects/metamask-e2e/docs/prompt-verification.md).
+maintained example with `npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- charter <feature-id>`
+(`charter --list` lists them), or author an arbitrary feature charter using the toolkit prompt guide at `$VERIFY_TOOLKIT_ROOT/docs/prompt-verification.md`.
 Pass `--charter /absolute/path/to/charter.json`; a free-form goal alone cannot pass.
-Before any run, lint it: `node /Users/surge/Desktop/Projects/metamask-e2e/src/verification/charter-lint.mjs --app . --charter <file>`
+Before any run, lint it: `node "$VERIFY_TOOLKIT_ROOT/src/verification/charter-lint.mjs" --app . --charter <file>`
 must pass. Fix every problem it reports. Bind dynamic row IDs with resource templates, never
 wildcards. Take expected values from `test/CONTRACT.md` or a bound resource, never guess them.
 Keep a charter to ten outcomes or fewer and split longer journeys into separate charters.
@@ -116,16 +126,16 @@ checkout lacks setup. Check first with `queue -- doctor --app . --charter <file>
 `--` reuses a caller-owned server; another checkout or production cannot prove local edits.
 
 ```bash
-npm --prefix /Users/surge/Desktop/Projects/metamask-e2e run verify:app -- -- --charter /tmp/feature-charter.json
+npm --prefix "$VERIFY_TOOLKIT_ROOT" run verify:app -- -- --charter /tmp/feature-charter.json
 # For a maintained catalog charter:
-npm --prefix /Users/surge/Desktop/Projects/metamask-e2e run verify:app -- -- --feature auth.metamask
+npm --prefix "$VERIFY_TOOLKIT_ROOT" run verify:app -- -- --feature auth.metamask
 # Recheck after your final edit, using the emitted jobId and current criteria:
-npm --prefix /Users/surge/Desktop/Projects/metamask-e2e run queue -- accept <job-id> --charter /tmp/feature-charter.json
+npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- accept <job-id> --charter /tmp/feature-charter.json
 ```
 
 For a refactor or any change that touches several features or commits, write one batch spec
 (cells of app checkout and charter or catalog feature, with repeats) and run
-`npm --prefix /Users/surge/Desktop/Projects/metamask-e2e run queue -- batch run <spec.json>`. Rerun the same
+`npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- batch run <spec.json>`. Rerun the same
 command to resume: finished cells are reused only while their app source, charter and toolkit are
 unchanged. A held batch names its remedy (repeated infrastructure blocks, or a funded attempt to
 reconcile before `--reconciled`). `queue -- batch status <spec.json>` prints the evidence matrix.
@@ -136,7 +146,7 @@ A mapped charter can be rechecked with `accept <job-id> --feature <feature-id>`.
 
 All browser checks and large unit suites use this shared queue across Codex and
 Claude; keep coding in parallel. Do not start verification servers before queue
-admission. Use `npm --prefix /Users/surge/Desktop/Projects/metamask-e2e run queue -- run -- <command>`
+admission. Use `npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- run -- <command>`
 for other heavy checks; typecheck, unit test, lint and build commands use a separate work
 lane and do not wait behind browser runs. To wait for a running verification, call
 `queue -- wait <job-uuid>` (or `--app <apps/defuse-near>`) through the same npm prefix
@@ -177,7 +187,20 @@ operations; generating a test file is optional.
   Reconcile ambiguous submissions before retrying; never blindly resubmit.
 
 For setup or tool details only, read the existing
-[prompt guide](/Users/surge/Desktop/Projects/metamask-e2e/docs/prompt-verification.md).
+toolkit prompt guide at `$VERIFY_TOOLKIT_ROOT/docs/prompt-verification.md`.
+
+## Keep the feature map current
+
+Use the active toolkit checkout's `catalog/<app>.json` as the feature map;
+`queue -- charter --list --app <app>` exposes its recipes. When the task changes
+mapped navigation, routes, source locations, hooks or prerequisites, reconcile
+that entry against the owning app source and follow the toolkit's documented
+maintenance check. Keep navigation, source anchors, gotchas and required
+outcomes together. Distinguish stale documentation, a harness gap and a product
+regression; never delete intended behavior to make a check green. Name any
+unmapped surfaces relevant to the task. Static maintenance is not live proof:
+run the affected journey before claiming the behavior verified. Use the same
+toolkit checkout for the map and the verification run.
 
 ## Regression and evidence
 
@@ -185,7 +208,7 @@ For a relevant existing Tier1 regression or an explicit request, queue the exact
 spec/named test below. Tier1 is an explicit regression path; `verify:app` uses Tester Army.
 
 ```bash
-npm --prefix /Users/surge/Desktop/Projects/metamask-e2e run queue -- run -- bunx playwright test test/modules/<module>/<file>.spec.ts --project=tier1 --workers=1 --retries=0 --grep '<exact regression name>'
+npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- run -- bunx playwright test test/modules/<module>/<file>.spec.ts --project=tier1 --workers=1 --retries=0 --grep '<exact regression name>'
 ```
 
 Use its owned fixtures/helpers; do not transplant wallets into Synpress fixtures.
