@@ -271,6 +271,9 @@ def main():
         except ValueError as error:
             raise SystemExit(str(error)) from error
         return
+    if args.command == "enable-auto-sync":
+        auto_sync()
+        return
     (HOME_DIR / ".agents").mkdir(parents=True, exist_ok=True)
     with (HOME_DIR / ".agents/.skill-config.lock").open("a") as lock:
         try:

@@ -152,6 +152,13 @@ class SkillInstallationTests(unittest.TestCase):
         self.assertEqual(plistlib.loads(config.read_bytes())['StartInterval'], 300)
         command.assert_called_once_with('launchctl', 'bootstrap', 'user/501', str(config))
 
+    def test_auto_sync_bootstrap_does_not_hold_the_install_lock(self):
+        with patch.object(sys, 'argv', ['skills.py', 'enable-auto-sync']), \
+             patch.object(skills, 'auto_sync') as enable, \
+             patch.object(skills.fcntl, 'flock', side_effect=AssertionError('Bootstrap must release the worker lock')):
+            skills.main()
+        enable.assert_called_once_with()
+
     def test_removed_skills_are_unlinked_and_unmanaged_skills_are_preserved(self):
         skills.install()
         retired = []
