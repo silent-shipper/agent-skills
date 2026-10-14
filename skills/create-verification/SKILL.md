@@ -1,6 +1,6 @@
 ---
 name: create-verification
-description: Verify Defuse changes with focused module tests and evidence-backed Tester Army using the funded MetaMask test account. Use for feature verification and regression checks, not the client portal or intents explorer.
+description: Verify Defuse changes, extend missing harness support, and maintain feature coverage with focused tests and evidence-backed Tester Army using the funded MetaMask test account. Not for the client portal or intents explorer.
 ---
 
 # Create Verification
@@ -33,6 +33,25 @@ assets, typed-data signing and transactions. Do not apply the CLI preparation
 swap allowlist or spending caps as a UI signing gate. Inspect live balances first. Normal feature
 verification needs no packaging, new account, wallet rebuild or copied tooling.
 
+## Choose the workflow
+
+Use this one skill throughout feature development. Select the workflow from the
+request and the capabilities available in the selected toolkit:
+
+- **Verify a change:** define success, reuse applicable coverage, execute the
+  actual behavior and inspect current-source evidence.
+- **Extend coverage:** identify missing setup, interaction or evidence support;
+  implement it with its existing owner and preserve a tested operating recipe.
+- **Maintain coverage:** audit a declared feature scope, repair verification
+  drift, rerun affected journeys and report product regressions separately.
+
+Read `$VERIFY_TOOLKIT_ROOT/docs/verification-contributing.md` for the shared
+contribution contract and the selected workflow. The toolkit owns that playbook
+and `catalog/<app>.json`; do not copy them into personal skills or add separate
+Perps/Earn skills. If the guide is absent, that checkout predates the contribution
+model: select an updated published toolkit or a task checkout before contributing.
+Preserve active worktrees and frozen jobs; never pull over work to repair setup.
+
 ## Requirement
 
 Invoking this skill means the change must be proven, not planned. Run every proof
@@ -58,6 +77,19 @@ work, `apps/defuse-near/test/CONTRACT.md`. Define acceptance criteria before
 implementing a new feature or verifying a change: required account state, user
 action and observable outcome, including relevant failure, cancellation or
 empty-state behavior.
+
+Inspect source and available runtime tools before choosing a charter. For every
+required outcome, establish how to perform the action and independently observe
+its effect. Check the signer, balance plane, services, persistence and cleanup.
+Classify missing support as an app contract, harness capability or external
+prerequisite. A new route or vault need not be mapped in advance; add reusable
+coverage during its development. Never substitute an easier catalog journey.
+
+Extend missing support within the authorized development scope and existing
+owners. A review-only request stays read-only. Preserve the expected behavior;
+repeated browser attempts cannot supply a missing evidence tool. A vault listing,
+a deposit holding and a completed redemption require different proof, as do Perps
+browsing and opening a position.
 
 For resting limit-order placement, place a small real order, assert its identity,
 amount, price and `OPEN` state, then cancel that test order and reconcile its
@@ -202,11 +234,23 @@ Use the active toolkit checkout's `catalog/<app>.json` as the feature map;
 mapped navigation, routes, source locations, hooks or prerequisites, reconcile
 that entry against the owning app source and follow the toolkit's documented
 maintenance check. Keep navigation, source anchors, gotchas and required
-outcomes together. Distinguish stale documentation, a harness gap and a product
-regression; never delete intended behavior to make a check green. Name any
+outcomes together. Preserve `playbook.steps`, outcome-bound evidence methods,
+cleanup and known gaps using the contribution guide's schema. Every outcome needs
+an evidence method; a recipe has no cached verified flag. Distinguish stale
+documentation, a harness gap and a product regression; never delete intended
+behavior to make a check green. Name any
 unmapped surfaces relevant to the task. Static maintenance is not live proof:
 run the affected journey before claiming the behavior verified. Use the same
 toolkit checkout for the map and the verification run.
+
+For maintenance, declare the feature IDs and app/toolkit identities, audit the
+map before and after reconciliation, then run doctor and every scoped journey
+through the existing verifier or batch. Keep failed, blocked and unrun features
+visible. Recheck readiness after unexpected failures and re-drive repairs; inspect
+ambiguous financial requests before another attempt. Product edits require the
+development task's authorization. Report clean only when all scoped source and
+live checks pass unchanged, changed when repairs are proven, otherwise blocked
+with the retained journey statuses. No recurring schedule or publication is implied.
 
 ## Regression and evidence
 
@@ -228,6 +272,15 @@ captures of the changed views.
 Keep task checks/reports ignored; retain regression tests after they pass on
 current source. A blocked browser does not stop independent tests.
 
+For new durable verification support, prove a relevant defect is rejected while
+a valid control passes. Execute new instructions end to end before calling them
+working support; setup/lifecycle changes also need a repeat from the documented
+starting state without manual rescue. Reconcile each funded attempt before a
+repeat. Label unexecuted support draft and retain missing prerequisites. Follow
+the toolkit's contribution checks and evaluation briefs for harness changes.
+Count only tests and typechecks that exercised the intended workspace; zero tests
+or an ancestor's TypeScript configuration do not prove a source-only fixture.
+
 Inspect `result.json`, `proof.json` and `tester/report.json` in the emitted
 `metamask-e2e/.e2e/verification/<run>/`. A result that did not pass carries `reason` (the
 tester's stop summary and first unfinished step), `toolErrors` and `explanation` (meaning and
@@ -248,3 +301,5 @@ For an interrupted funded action, recover only its exact persisted resources wit
 Report target, exact command, passed/failed/blocked result, assertions, evidence
 path and remaining gaps. Keep authenticated traces private. A task check does
 not establish full Tier1 coverage.
+After teardown, confirm named evidence files remain readable. Preserve exact
+resource and recovery identities when a funded action is unfinished.
