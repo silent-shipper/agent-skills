@@ -10,6 +10,8 @@ import plistlib
 import re
 import subprocess
 import sys
+import pwd
+import tempfile
 from datetime import datetime
 from urllib.parse import unquote, urlsplit
 
@@ -59,6 +61,74 @@ def toolkit_root():
     if len(valid) != 1:
         raise ValueError("Set METAMASK_E2E_ROOT to the intended toolkit checkout with queue/verify:app scripts and docs/prompt-verification.md; found " + str(len(valid)) + " valid roots.")
     return valid[0]
+
+
+def toolkit_identity():
+    root = toolkit_root()
+    # Use the verifier's source owner so this receipt has the same digest as jobs.
+    script = "const {repository}=await import(process.argv[1]); const s=await repository(process.argv[2]); console.log(JSON.stringify({root:s.root,revision:s.revision,digest:s.digest}));"
+    data = json.loads(run("node", "--input-type=module", "-e", script,
+                          (root / "src/verification/source.mjs").as_uri(), str(root)))
+    data["dirty_files"] = ([] if (root / ".toolkit-snapshot.json").is_file() else
+                           run("git", "-C", str(root), "status", "--porcelain", quiet=True).splitlines())
+    data["selection"] = "explicit" if os.environ.get("METAMASK_E2E_ROOT") else "default"
+    if data["dirty_files"] and data["selection"] == "default":
+        raise ValueError("Default toolkit has unpublished edits. Preserve them in a task checkout; select the intended task toolkit explicitly with METAMASK_E2E_ROOT. " + str(root))
+    return data
+
+
+def sync_health(current, receipt):
+    if current["dirty_files"]:
+        return {"status": "blocked", "reason": "Installed checkout has local edits; develop in a task worktree."}
+    if not receipt or receipt.get("status") != "synced":
+        return {"status": "blocked", "reason": (receipt or {}).get("reason", "No successful sync receipt; run skills.py sync.")}
+    if any(current[key] != receipt.get(key) for key in ("repo_head", "source_sha256")):
+        return {"status": "blocked", "reason": "Installed source differs from the last successful sync."}
+    try:
+        age = (datetime.now().astimezone() - datetime.fromisoformat(receipt["at"])).total_seconds()
+    except (KeyError, ValueError, TypeError):
+        age = -1
+    if not 0 <= age <= 900:
+        return {"status": "stale", "reason": "Sync receipt is older than 15 minutes or invalid; run skills.py sync."}
+    return {"status": "ready"}
+
+
+def edit(name):
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", name):
+        raise SystemExit("Use a lowercase task name with letters, digits and hyphens.")
+    installed = HOME_DIR / ".agents/skill-config"
+    run(sys.executable, str(installed / "scripts/skills.py"), "sync")
+    target = HOME_DIR / ".agents/skill-worktrees" / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    run("git", "-C", str(installed), "worktree", "add", "-b", "skills/" + name, str(target), "HEAD")
+    print(target)
+
+
+def publish(peer):
+    if REPO == (HOME_DIR / ".agents/skill-config").resolve():
+        raise SystemExit("Publish from the task worktree, not the installed checkout.")
+    if run("git", "-C", str(REPO), "status", "--porcelain"):
+        raise SystemExit("Review and commit the intended task changes before publishing.")
+    if not re.fullmatch(r"[a-zA-Z0-9_.@:-]+", peer) or peer.startswith("-"):
+        raise SystemExit("Invalid peer SSH target.")
+    run(sys.executable, "-m", "unittest", "discover", "-s", str(REPO / "tests"))
+    run(sys.executable, "-m", "unittest", "discover", "-s", str(REPO / "skills/remote-session/scripts"), "-p", "test_*.py")
+    # Validate discovery in isolation; a candidate must never replace live links.
+    with tempfile.TemporaryDirectory(prefix="skill-candidate-") as temporary:
+        subprocess.run([sys.executable, str(REPO / "scripts/skills.py"), "install", "--candidate"],
+                       env={**os.environ, "HOME": temporary}, check=True)
+    run("git", "-C", str(REPO), "push", "origin", "HEAD:refs/heads/main")
+    installed = HOME_DIR / ".agents/skill-config/scripts/skills.py"
+    run(sys.executable, str(installed), "sync")
+    ssh = ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=10", peer]
+    remote = "export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH; python3 ~/.agents/skill-config/scripts/skills.py sync >/dev/null && python3 ~/.agents/skill-config/scripts/skills.py ready"
+    other = json.loads(run(*ssh, remote))
+    local = json.loads(run(sys.executable, str(installed), "ready"))
+    expected = identity()
+    for state in (local, other):
+        if any(state[key] != expected[key] for key in ("repo_head", "source_sha256", "manifest_sha256")):
+            raise SystemExit("Published, but devices have not converged on this candidate. Inspect readiness on both hosts.")
+    print(json.dumps({"status": "published-and-synced", "peer": peer, "repo_head": expected["repo_head"], "source_sha256": expected["source_sha256"]}))
 
 
 def identity():
@@ -166,7 +236,7 @@ def backup(path, directory):
         path.rename(target)
 
 
-def install():
+def install(synced=False):
     skills = manifest()
     directory = HOME_DIR / ".agents/skill-backups" / datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     config = HOME_DIR / ".codex/config.toml"
@@ -189,16 +259,16 @@ def install():
         temporary.chmod(0o600)
         temporary.replace(config)
     try:
-        check()
+        check(installation_only=True)
     except SystemExit:
         record_status("blocked", "Installed skill checks failed; run check for the exact errors.")
         raise
-    record_status("installed")
+    record_status("synced" if synced else "installed")
     if directory.exists():
         print("Backups:", directory)
 
 
-def check():
+def check(installation_only=False, require_sync=False):
     skills = manifest()
     errors = reference_errors(skills) + ["Retired skill still linked: " + str(path) for path in retired_links(skills)]
     for path, target in managed_paths(skills).items():
@@ -212,19 +282,22 @@ def check():
         if values != [skill["codex_enabled"]]:
             errors.append("Incorrect Codex discovery setting: " + skill["name"])
     try:
-        toolkit = {"status": "ready", "root": str(toolkit_root())}
-    except ValueError as error:
-        toolkit = {"status": "unconfigured", "remedy": str(error)}
+        toolkit = {"status": "ready", **toolkit_identity()}
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
+        toolkit = {"status": "blocked", "remedy": str(error)}
     status_path = HOME_DIR / ".agents/skill-sync-status.json"
     try:
         last_sync = json.loads(status_path.read_text())
     except (OSError, ValueError):
         last_sync = None
-    print(json.dumps({"status": "FAIL" if errors else "PASS", "skills_checked": len(skills),
-                      "links_checked": len(managed_paths(skills)), "errors": errors, **identity(),
+    current = identity()
+    health = sync_health(current, last_sync)
+    status = "FAIL" if errors else "PASS" if installation_only or health["status"] == "ready" else "BLOCKED"
+    print(json.dumps({"status": status, "installation_status": "FAIL" if errors else "PASS", "sync": health, "skills_checked": len(skills),
+                      "links_checked": len(managed_paths(skills)), "errors": errors, **current,
                       "toolkits": {"metamask-e2e": toolkit}, "last_sync": last_sync,
                       "auto_sync_installed": (HOME_DIR / "Library/LaunchAgents" / (LABEL + ".plist")).is_file()}, indent=2))
-    if errors:
+    if errors or require_sync and health["status"] != "ready":
         raise SystemExit(1)
 
 
@@ -234,10 +307,13 @@ def sync():
         raise SystemExit("Local edits exist; commit and push them before syncing.")
     try:
         run("git", "-C", str(REPO), "pull", "--ff-only")
+        if run("git", "-C", str(REPO), "rev-parse", "HEAD") != run("git", "-C", str(REPO), "rev-parse", "@{upstream}"):
+            record_status("blocked", "Installed checkout contains unpublished commits; publish from a task worktree.")
+            raise SystemExit("Installed checkout contains unpublished commits.")
     except subprocess.CalledProcessError as error:
         record_status("blocked", "Git pull --ff-only failed; inspect authentication or divergent history.")
         raise SystemExit("Git pull --ff-only failed; local work was not reset.") from error
-    os.execv(sys.executable, [sys.executable, str(REPO / "scripts/skills.py"), "install"])
+    os.execv(sys.executable, [sys.executable, str(REPO / "scripts/skills.py"), "install", "--from-sync"])
 
 
 def auto_sync():
@@ -263,14 +339,32 @@ def auto_sync():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("install", "check", "sync", "enable-auto-sync", "toolkit-root"))
+    parser.add_argument("command", choices=("install", "check", "ready", "sync", "edit", "publish", "enable-auto-sync", "toolkit-root", "toolkit-identity"))
+    parser.add_argument("name", nargs="?")
+    parser.add_argument("--peer")
+    parser.add_argument("--candidate", action="store_true", help="Validate installation in a temporary HOME only")
+    parser.add_argument("--from-sync", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
-    if args.command == "toolkit-root":
+    if args.command in ("toolkit-root", "toolkit-identity"):
         try:
-            print(toolkit_root())
-        except ValueError as error:
+            state = toolkit_identity()
+            print(state["root"] if args.command == "toolkit-root" else json.dumps(state))
+        except (ValueError, OSError, subprocess.SubprocessError) as error:
             raise SystemExit(str(error)) from error
         return
+    if args.command == "edit":
+        if not args.name:
+            parser.error("edit requires a task name")
+        edit(args.name)
+        return
+    if args.command == "publish":
+        if not args.peer:
+            parser.error("publish requires --peer user@host")
+        publish(args.peer)
+        return
+    if args.command == "install" and REPO != (HOME_DIR / ".agents/skill-config").resolve():
+        if not args.candidate or HOME_DIR == Path(pwd.getpwuid(os.getuid()).pw_dir).resolve():
+            raise SystemExit("Candidate installs require --candidate and a temporary HOME; live skills must use ~/.agents/skill-config.")
     if args.command == "enable-auto-sync":
         auto_sync()
         return
@@ -280,7 +374,12 @@ def main():
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise SystemExit("Another skill-config operation is running.")
-        {"install": install, "check": check, "sync": sync, "enable-auto-sync": auto_sync}[args.command]()
+        if args.command == "install":
+            install(synced=args.from_sync)
+        elif args.command == "ready":
+            check(require_sync=True)
+        else:
+            {"check": check, "sync": sync}[args.command]()
 
 
 if __name__ == "__main__":

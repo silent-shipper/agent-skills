@@ -9,11 +9,17 @@ Resolve the existing personal toolkit on this host once:
 
 ```bash
 VERIFY_TOOLKIT_ROOT="$(python3 ~/.agents/skill-config/scripts/skills.py toolkit-root)"
+python3 ~/.agents/skill-config/scripts/skills.py toolkit-identity
 ```
 
 Stop if resolution fails. `METAMASK_E2E_ROOT` selects an explicit checkout when
 needed; otherwise the resolver checks the two installed Mac locations. Use the
 same resolved root for every command, guide, feature map and evidence path.
+The identity command blocks implicit use of a dirty shared checkout. For ongoing
+experimental work, explicitly select that task checkout and retain its revision
+and content digest with the task evidence. New toolkit edits belong in a separate
+worktree. The managed verifier already snapshots and binds toolkit source for
+each run; reuse that owner rather than introducing another source identity.
 The root check proves installed scripts and documentation, not external runner
 login or browser readiness; use the toolkit's doctor before queueing.
 Reuse its funded test account, configured wallet, credentials and ChatGPT connection.

@@ -28,7 +28,7 @@ def run(args, cwd=None):
 def credential_path(name):
     path = Path(name)
     return (any(part in {'.git', '.ssh', '.aws', '.metamask-e2e', 'node_modules'} for part in path.parts)
-            or path.name.startswith('.env') and path.name not in {'.env.example', '.env.template'}
+            or path.name.startswith('.env') and not path.name.endswith(('.example', '.template'))
             or path.suffix.lower() in {'.pem', '.key', '.p12', '.pfx'}
             or path.name.lower() in {'credentials.json', 'credentials'})
 
@@ -77,6 +77,23 @@ def verify(root, manifest):
     if head != manifest['head']:
         mismatches.insert(0, 'HEAD')
     return {'status': 'failed' if mismatches else 'passed', 'checkedFiles': len(manifest['files']), 'mismatches': mismatches}
+
+
+def readiness(toolkit=None):
+    script = Path.home() / '.agents/skill-config/scripts/skills.py'
+    skills = json.loads(run([sys.executable, str(script), 'ready']))
+    result = {'skills': {key: skills[key] for key in ('repo_head', 'source_sha256')}}
+    if toolkit:
+        result['toolkit'] = json.loads(run(['env', 'METAMASK_E2E_ROOT=' + str(toolkit),
+                                          sys.executable, str(script), 'toolkit-identity']))
+    return result
+
+
+def assert_readiness(expected, actual):
+    if expected['skills'] != actual['skills']:
+        raise ValueError('Required skills differ between hosts; publish and sync before handoff.')
+    if expected.get('toolkit', {}).get('digest') != actual.get('toolkit', {}).get('digest'):
+        raise ValueError('Required toolkit source differs between hosts; transfer the selected task toolkit and verify its digest before handoff.')
 
 
 class RpcSocket:
@@ -165,6 +182,8 @@ def remote(spec_path):
     spec_path = Path(spec_path)
     spec = json.loads(spec_path.read_text())
     directory = spec_path.parent
+    if spec['mode'] == 'send':
+        assert_readiness(spec['readiness'], readiness(spec.get('remoteToolkitRoot')))
     home = Path(spec.get('t3Home', '~/.t3')).expanduser()
     runtime = json.loads((home / 'userdata/server-runtime.json').read_text())
     command = shlex.split(run(['ps', '-p', str(runtime['pid']), '-o', 'command=']).decode())
@@ -220,6 +239,10 @@ def remote(spec_path):
                           f'Run python3 {directory}/remote_session.py verify --cwd "$PWD" --manifest {directory}/manifest.json. '
                           'A mismatch blocks further work; do not discard edits or manufacture a match. Dependencies and credentials '
                           'are separate; reuse the remote setup. Report that import verification, then continue the task below.\n\n')
+        if spec.get('remoteToolkitRoot'):
+            import_context += (f"Use METAMASK_E2E_ROOT={shlex.quote(spec['remoteToolkitRoot'])} for this task's toolkit. "
+                               f"Its verified native source digest is {spec['readiness']['toolkit']['digest']}. "
+                               "Recheck skills.py toolkit-identity before dependent work; do not substitute the default toolkit.\n\n")
         payload = {'commandId': str(uuid.uuid4()), 'threadId': thread_id, 'creationSource': 'server', 'projectId': project['id'],
                    'title': spec['title'], 'modelSelection': spec['modelSelection'], 'runtimeMode': spec['runtimeMode'],
                    'interactionMode': spec['interactionMode'], 'workspaceStrategy': {
@@ -268,6 +291,8 @@ def main():
     command.add_argument('--context', required=True)
     command.add_argument('--title', required=True)
     command.add_argument('--file', action='append', default=[])
+    command.add_argument('--toolkit-root', help='Exact toolkit required by this task')
+    command.add_argument('--remote-toolkit-root', help='Matching toolkit already staged on the target')
     command.add_argument('--provider', required=True)
     command.add_argument('--model', required=True)
     command.add_argument('--model-options', default='{}')
@@ -295,6 +320,10 @@ def main():
         directory = Path(temporary)
         spec = {'id': identifier, 'mode': args.mode, 't3Home': args.t3_home}
         if args.mode == 'send':
+            if bool(args.toolkit_root) != bool(args.remote_toolkit_root):
+                raise ValueError('Pass both --toolkit-root and --remote-toolkit-root for a toolkit-dependent task.')
+            spec['readiness'] = readiness(args.toolkit_root)
+            spec['remoteToolkitRoot'] = args.remote_toolkit_root
             source = stage(args.cwd, directory, args.file, args.context)
             if source['omittedUntracked']:
                 raise ValueError('Untracked files omitted; select them with --file or move unrelated files out of this handoff checkout: '
@@ -309,7 +338,8 @@ def main():
              *[str(path) for path in directory.iterdir()], args.ssh + ':' + destination + '/'])
         if args.mode == 'send':
             print(json.dumps({'status': 'staged', 'ssh': args.ssh, 'staging': destination, 'head': source['head']}), flush=True)
-        result = run(ssh + [shlex.join(['python3', destination + '/remote_session.py', '_remote', destination + '/spec.json'])])
+        result = run(ssh + [shlex.join(['env', 'PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+                                       'python3', destination + '/remote_session.py', '_remote', destination + '/spec.json'])])
         print(result.decode().strip())
         if args.mode == 'probe':
             run(ssh + [shlex.join(['rm', '-r', destination])])

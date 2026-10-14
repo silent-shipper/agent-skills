@@ -6,4 +6,4 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from skills import check
 
 if __name__ == "__main__":
-    check()
+    check(require_sync=True)

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -44,7 +45,9 @@ class SkillInstallationTests(unittest.TestCase):
         self.assertEqual({p: p.readlink() for p in links}, links)
         result = subprocess.run([sys.executable, str(self.home / ".agents/check-skills.py")],
                                 env={"HOME": str(self.home)}, capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)['installation_status'], 'PASS')
+        self.assertEqual(json.loads(result.stdout)['status'], 'BLOCKED')
 
     def test_config_preserves_unrelated_tables_and_replaces_only_managed_entries(self):
         old = 'model = "keep-this-model"\n\n[features]\nfoo = true\n\n'
@@ -210,8 +213,8 @@ class SkillInstallationTests(unittest.TestCase):
         git('commit', '-m', 'Initial installer')
         subprocess.run(['git', 'clone', '-q', str(origin), str(checkout)], check=True)
         script = origin / 'scripts/skills.py'
-        script.write_text(script.read_text().replace('def install():\n',
-            'def install():\n    (HOME_DIR / "pulled-installer-ran").write_text("new revision")\n'))
+        script.write_text(script.read_text().replace('def install(synced=False):\n',
+            'def install(synced=False):\n    (HOME_DIR / "pulled-installer-ran").write_text("new revision")\n'))
         git('add', '.')
         git('commit', '-m', 'Update installer')
         result = subprocess.run([sys.executable, str(checkout / 'scripts/skills.py'), 'sync'],
@@ -219,6 +222,54 @@ class SkillInstallationTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual((self.home / 'pulled-installer-ran').read_text(), 'new revision')
+        state = json.loads((self.home / '.agents/skill-sync-status.json').read_text())
+        self.assertEqual(state['status'], 'synced')
+        ready = subprocess.run([sys.executable, str(checkout / 'scripts/skills.py'), 'ready'],
+                               env={'HOME': str(self.home), 'PATH': os.environ['PATH']}, capture_output=True, text=True)
+        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        # A locally committed change must not masquerade as a published installation.
+        subprocess.run(['git', '-C', str(checkout), 'config', 'user.name', 'Fixture'], check=True)
+        subprocess.run(['git', '-C', str(checkout), 'config', 'user.email', 'fixture@example.invalid'], check=True)
+        (checkout / 'surge-defaults.md').write_text('Unpublished default\n')
+        subprocess.run(['git', '-C', str(checkout), 'add', 'surge-defaults.md'], check=True)
+        subprocess.run(['git', '-C', str(checkout), 'commit', '-qm', 'Unpublished'], check=True)
+        blocked = subprocess.run([sys.executable, str(checkout / 'scripts/skills.py'), 'sync'],
+                                 env={'HOME': str(self.home), 'PATH': os.environ['PATH']}, capture_output=True, text=True)
+        self.assertNotEqual(blocked.returncode, 0)
+        self.assertIn('unpublished commits', blocked.stderr)
+        self.assertEqual((checkout / 'surge-defaults.md').read_text(), 'Unpublished default\n')
+
+    def test_sync_health_rejects_dirty_stale_changed_and_failed_receipts(self):
+        current = {'repo_head': 'head', 'source_sha256': 'content', 'dirty_files': []}
+        receipt = {**current, 'status': 'synced', 'at': datetime.now(timezone.utc).isoformat()}
+        self.assertEqual(skills.sync_health(current, receipt)['status'], 'ready')
+        self.assertEqual(skills.sync_health({**current, 'dirty_files': [' M helper.py']}, receipt)['status'], 'blocked')
+        self.assertEqual(skills.sync_health({**current, 'source_sha256': 'changed'}, receipt)['status'], 'blocked')
+        self.assertEqual(skills.sync_health(current, {**receipt, 'status': 'blocked'})['status'], 'blocked')
+        old = (datetime.now(timezone.utc) - timedelta(minutes=16)).isoformat()
+        self.assertEqual(skills.sync_health(current, {**receipt, 'at': old})['status'], 'stale')
+        self.assertEqual(skills.sync_health(current, {**receipt, 'at': 'invalid'})['status'], 'stale')
+
+    def test_toolkit_dirty_default_requires_explicit_selection(self):
+        root = self.home / 'toolkit'
+        with patch.object(skills, 'toolkit_root', return_value=root), \
+             patch.object(skills, 'run', side_effect=[json.dumps({'root': str(root), 'revision': 'rev', 'digest': 'native-digest'}), ' M src/runtime.mjs']), \
+             patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(ValueError, 'unpublished edits'):
+                skills.toolkit_identity()
+        with patch.object(skills, 'toolkit_root', return_value=root), \
+             patch.object(skills, 'run', side_effect=[json.dumps({'root': str(root), 'revision': 'rev', 'digest': 'native-digest'}), ' M src/runtime.mjs']), \
+             patch.dict(os.environ, {'METAMASK_E2E_ROOT': str(root)}, clear=True):
+            state = skills.toolkit_identity()
+        self.assertEqual(state['digest'], 'native-digest')
+        self.assertEqual(state['selection'], 'explicit')
+
+    def test_candidate_cannot_install_over_live_aliases(self):
+        result = subprocess.run([sys.executable, str(skills.REPO / 'scripts/skills.py'), 'install'],
+                                env={'HOME': str(self.home), 'PATH': os.environ['PATH']}, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Candidate installs', result.stderr)
+        self.assertFalse((self.home / '.codex/skills').exists())
 
 
 if __name__ == "__main__":

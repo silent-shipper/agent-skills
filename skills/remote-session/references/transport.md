@@ -37,6 +37,13 @@ nondefault data directory. Its normal bearer sessions authenticate the app's
 HTTP/WebSocket orchestration interface. They are not provider MCP credentials:
 feeding these tokens to `/mcp` produced HTTP 401 in the actual handoff.
 
+`send` requires fresh successful skill sync receipts on both hosts and compares
+complete skill source hashes before launching. For a task that depends on
+metamask-e2e, add `--toolkit-root /source/task/toolkit` and
+`--remote-toolkit-root /target/task/toolkit`. Stage a differing task toolkit using
+its source snapshot first. The gate compares the existing verifier's source digest;
+it does not copy credentials, overwrite toolkits, or establish runner login.
+
 The app-owned interfaces used are `/api/projects`, `/api/projects/mutate`,
 `/api/orchestration/threads/<id>` with `x-t3-orchestration-protocol: 2`, and `/ws`
 with `orchestrationProtocol=2` and the `orchestration.launchThread` RPC. The RPC

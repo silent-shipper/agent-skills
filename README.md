@@ -26,7 +26,10 @@ python3 ~/.agents/skill-config/scripts/skills.py enable-auto-sync
 ```
 
 It pulls with `--ff-only` and installs from the pulled revision. Dirty checkouts
-stop without overwriting work. The checker reports the last install/sync state;
+stop without overwriting work. The checker reports installation and sync health separately; a blocked or stale
+sync returns `BLOCKED`, even when all installed links pass. `ready` exits nonzero
+unless the successful sync receipt is less than 15 minutes old and matches the
+complete installed source. Failures are visible at the start of coding work;
 failures remain in `~/.agents/skill-sync-status.json` and
 `~/Library/Logs/agent-skills/sync-error.log`. A new provider session is needed to
 reload a changed discovery list. In-flight sessions may still hold earlier skill
@@ -129,44 +132,55 @@ local skills are preserved.
 Credentials, MCP configuration, provider plugin caches and app-managed `synced`
 skills are outside this repository.
 
-## Publish changes from either Mac
+## Change and publish skills
 
-Sync before you start editing. Change skills under
-`~/.agents/skill-config/skills/<skill-name>/`, edit `surge-defaults.md` for shared
-coding defaults, or edit `manifest.json` for the managed skill list. Provider
-skill paths are links to these same files. To stop syncing a skill, remove its
-manifest entry and its `skills/<skill-name>/` directory, then publish the change.
-
-Apply and check your edits, review the diff, then commit and push:
+The installed `~/.agents/skill-config` checkout consumes published commits. Never
+edit it through its provider aliases. Start a task worktree instead:
 
 ```sh
-cd ~/.agents/skill-config
-python3 scripts/skills.py install
-python3 scripts/skills.py check
-git diff
-git add -- <changed-paths>
-git commit -m "Update personal skills"
-git push
+python3 ~/.agents/skill-config/scripts/skills.py edit improve-verification
+cd ~/.agents/skill-worktrees/improve-verification
 ```
 
-Then run the sync command on **every device**, including the Mac where you made
-the changes:
+Edit `skills/`, `manifest.json`, or `surge-defaults.md` there. Run the tests, review
+the diff and commit only the intended paths. Candidate installation is allowed
+only with `install --candidate` and an isolated temporary `HOME`; it cannot replace
+live provider links. Then publish from the task worktree:
 
 ```sh
-python3 ~/.agents/skill-config/scripts/skills.py sync
+python3 scripts/skills.py publish --peer surge@100.108.123.39
 ```
 
-Check that each device has the same commit with:
+The example targets the Mini from the MacBook. From the Mini, use the configured
+SSH address of the MacBook. Publication runs the sync and remote-helper tests,
+validates a candidate installation in a temporary home, pushes to `origin/main`
+without force, syncs both devices and compares commit, manifest and complete
+source hashes. A failed peer check leaves the publication visible but does not
+report convergence; repair the prerequisite and rerun. Explicit local-only work
+stops before publication and is labeled unpublished.
+
+The five-minute job continues using safe fast-forward sync. It refuses local
+edits and unpublished commits. Task worktrees and running jobs are never pulled
+by this job. Completing a shared skill change includes both-host verification.
+
+## Session readiness
 
 ```sh
-git -C ~/.agents/skill-config rev-parse HEAD
+python3 ~/.agents/skill-config/scripts/skills.py ready
 ```
+
+Shared coding defaults require this once at the start of coding work. For a stale
+receipt, run `sync` and recheck. The receipt proves installed files, including
+helper scripts; a running agent may have loaded older instructions. Re-read changed
+skills and start a new session for discovery changes. This is an agent startup
+instruction, not a T3 process-start hook.
 
 ## If sync stops
 
 - **Local edits exist:** inspect `git -C ~/.agents/skill-config status` and
-  `git -C ~/.agents/skill-config diff`. Commit and push the edits you want to keep
-  before syncing, or stash them and restore them after syncing.
+  `git -C ~/.agents/skill-config diff`. Preserve them in a task worktree, publish the reviewed changes from there,
+  then remove only the exact backed-up edits from the installation and sync.
+  Do not restore experimental changes into the installed checkout.
 - **History has diverged:** reconcile the local and GitHub commits in the checkout,
   resolve any conflicts, and push the result before retrying. Sync never resets
   or automatically overwrites your work.
@@ -209,3 +223,12 @@ external login/account readiness.
 commit `1dcc2bacde73ddd284803b7af28164d0436198fc`. Each includes the original MIT
 license. Routing and structural correction ideas also inform `surge-mode` and
 `retro`; the full pstack orchestration is not installed.
+
+Before using the toolkit, run `skills.py toolkit-identity`. It records the native
+verifier revision/content digest and dirty state. An edited default checkout is
+blocked; an existing experiment must be selected explicitly with
+`METAMASK_E2E_ROOT=/absolute/task/checkout`. Keep new toolkit development in task
+worktrees and publish tested shared changes through that repository's workflow.
+The toolkit already freezes and binds source for queued jobs; retain that owner.
+No background job updates active toolkit or app worktrees. This repository's sync
+job distributes skills only, not arbitrary repository edits or credentials.

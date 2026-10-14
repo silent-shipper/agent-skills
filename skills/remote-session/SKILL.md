@@ -24,6 +24,13 @@ deployment, credential migration or publication.
   T3 service does not establish these. Carry required guidance or resolve its
   installed source; report missing login/configuration rather than silently
   copying credentials. Different app revisions need a fresh validation baseline.
+- Require `skills.py ready` on both Macs and matching complete skills source
+  hashes. For verification-dependent tasks, pass the helper both `--toolkit-root`
+  and `--remote-toolkit-root`, naming the exact task toolkits. Its prelaunch gate
+  compares the verifier's native source digest. If they differ, stage the required
+  toolkit in an isolated target checkout first; do not overwrite its shared checkout
+  or silently substitute whichever toolkit is installed. Capture login readiness
+  separately; matching source alone does not establish it.
 - Write the handoff context to a private temporary file: intended outcome,
   accepted decisions, authorization/checkpoints, changed owners, exact checks
   and results, evidence locations, active owned jobs, blockers and next actions.
@@ -61,5 +68,16 @@ after a lost launch response inspect that ID before considering a retry. Do not
 create duplicate conversations. Stop local execution after successful cutover.
 Link the new thread as `[title](t3-thread://v1/<threadId>)` and state any remaining
 import or verification gap. Distinguish thread launch, verified source sync and
-readiness to resume the task. This skill does not imply a commit, push, deployment
-or message to another person.
+readiness to resume the task.
+
+After source import is verified, read the remote thread's workspace, live run state
+and recent activity. Automatically settle the source thread once the remote run
+is `running`, has begun the handed-off task and has no pending request. Use the
+source environment's `t3_thread_organize` with `action: "settle"`; settlement takes
+effect when the source turn completes. Launch acceptance, `preparing`, `queued` or
+`starting` alone is insufficient. Keep the source active if the remote thread is
+waiting, stopped, failed or its import or execution is unresolved, and report the
+exact gap. Respect an explicit request to keep the source thread active. Do not
+wait for the remote task to finish before settling after a successful cutover.
+
+This skill does not imply a commit, push, deployment or message to another person.

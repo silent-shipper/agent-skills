@@ -10,10 +10,25 @@ import threading
 import unittest
 from pathlib import Path
 
-from remote_session import RpcSocket, credential_path, run, stage, verify
+from remote_session import RpcSocket, assert_readiness, credential_path, run, stage, verify
 
 
 class RemoteSessionTests(unittest.TestCase):
+    def test_handoff_requires_complete_skills_and_native_toolkit_identity(self):
+        source = {'skills': {'repo_head': 'same-head', 'source_sha256': 'helpers-too'},
+                  'toolkit': {'root': '/laptop/task', 'digest': 'native-source'}}
+        target = {'skills': dict(source['skills']), 'toolkit': {'root': '/mini/task', 'digest': 'native-source'}}
+        assert_readiness(source, target)
+        target['skills']['source_sha256'] = 'different-helper'
+        with self.assertRaisesRegex(ValueError, 'skills differ'):
+            assert_readiness(source, target)
+        target['skills'] = dict(source['skills'])
+        target['toolkit']['digest'] = 'different-source'
+        with self.assertRaisesRegex(ValueError, 'toolkit source differs'):
+            assert_readiness(source, target)
+        with self.assertRaisesRegex(ValueError, 'toolkit source differs'):
+            assert_readiness(source, {'skills': source['skills']})
+
     def test_snapshot_reconstructs_staged_and_unstaged_edits_rename_delete_and_new_files(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / 'source'
@@ -54,6 +69,11 @@ class RemoteSessionTests(unittest.TestCase):
         self.assertTrue(credential_path('.env.private-key-runtime.local'))
         self.assertTrue(credential_path('.metamask-e2e/bootstrap/profile'))
         self.assertFalse(credential_path('.env.example'))
+        self.assertFalse(credential_path('apps/web/.env.local.example'))
+        self.assertFalse(credential_path('apps/web/.env.e2e.secrets.example'))
+        self.assertFalse(credential_path('apps/web/.env.production.template'))
+        self.assertTrue(credential_path('apps/web/.env.local'))
+        self.assertTrue(credential_path('apps/web/.env.local.example.backup'))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             run(['git', 'init', '-q'], root)

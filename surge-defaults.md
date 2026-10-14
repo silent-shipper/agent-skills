@@ -37,6 +37,28 @@ requested scope and checkpoint; project guidance supplies domain rules.
   answers to roughly 4–6 short bullets; expand when the work requires it.
 
 Personal skills with the same name share one maintained source through aliases.
+At the start of coding work, run `python3 ~/.agents/skill-config/scripts/skills.py ready`
+once. If stale, run `sync` and recheck; a blocked sync must be stated and resolved
+before relying on changed skills. Independent repo inspection can continue.
+The receipt proves installed content, not text already loaded into this session;
+re-read required changed skills and start a new session for discovery changes.
+
+Keep `~/.agents/skill-config` as the clean published installation. To change
+personal skills or defaults, run `python3 ~/.agents/skill-config/scripts/skills.py edit <task>`
+and edit the returned worktree. Validate there, review and commit the intended
+paths, then run its `scripts/skills.py publish --peer <user@other-mac>`.
+Completing a requested shared skill change includes publication and verification
+on both configured Macs unless the user requests local-only work. Report a
+blocked peer or publication explicitly; never label a local edit synced.
+
+Keep shared toolkit development in task worktrees. Before verification, select
+the intended toolkit, record `skills.py toolkit-identity`, and use that same root
+throughout. A dirty default toolkit blocks implicit selection; an experimental
+task checkout must be selected explicitly with `METAMASK_E2E_ROOT`. Preserve
+running jobs and their frozen snapshots when publishing newer tooling. Ordinary
+app repos use Git branches and task worktrees; never background-pull or mirror
+an active worktree. Cross-machine continuation uses a verified source handoff.
+
 If a historical skill link is missing, resolve the installed skill by name before
 asking the user to repair it. Run `python3 /Users/surge/.agents/check-skills.py`
 after changing personal skill files, links or discovery settings.
