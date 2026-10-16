@@ -1,6 +1,6 @@
 # Shared agent skills
 
-Private source of truth for Surge's 18 enabled personal skills and coding defaults on the
+Private source of truth for Surge's 22 enabled personal skills and coding defaults on the
 MacBook Pro and Mac mini. Codex and Claude use links to the same checkout.
 
 ## Current setup
@@ -11,8 +11,8 @@ device only after publication and a successful sync:
 
 | Device | Codex | Claude Code |
 | --- | --- | --- |
-| MacBook Pro | 18 enabled personal skills | The same 18 personal skills |
-| Mac mini | 18 enabled personal skills | The same 18 personal skills |
+| MacBook Pro | 22 enabled personal skills | The same 22 personal skills |
+| Mac mini | 22 enabled personal skills | The same 22 personal skills |
 
 Codex, Claude Code, and an existing Claude Alt home share `surge-defaults.md`.
 Credentials and provider login/configuration are never synced. An Alt home is
@@ -40,13 +40,16 @@ text, so installed hashes do not prove which text a running agent already read.
 - `architect` — design ownership and module boundaries
 - `arena` — compare independent candidates
 - `benchmark-checklist` — qualify performance and reliability measurements
+- `blast-radius` — prove what a change could break beyond the diff
 - `breakdown` — concise change summaries
+- `correct` — turn repeated agent mistakes into enforced structure
 - `create-verification` — verify supported Defuse changes
 - `grill-to-goal` — clarify goals and decisions
 - `improve-codebase-architecture` — find architectural improvements
 - `how` — explain subsystem flow and ownership from evidence
 - `interrogate` — adversarial review
 - `karpathy-guidelines` — simple, focused coding
+- `recall` — rebuild context and steering patterns from past transcripts
 - `reflect` — examine and improve skills and tooling
 - `remote-session` — move worktree state and context to remote T3
 - `retro` — learn from completed work

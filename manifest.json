@@ -14,7 +14,15 @@
       "codex_enabled": true
     },
     {
+      "name": "blast-radius",
+      "codex_enabled": true
+    },
+    {
       "name": "breakdown",
+      "codex_enabled": true
+    },
+    {
+      "name": "correct",
       "codex_enabled": true
     },
     {
@@ -42,6 +50,10 @@
       "codex_enabled": true
     },
     {
+      "name": "recall",
+      "codex_enabled": true
+    },
+    {
       "name": "reflect",
       "codex_enabled": true
     },
@@ -55,6 +67,10 @@
     },
     {
       "name": "review-guide",
+      "codex_enabled": true
+    },
+    {
+      "name": "sharpen",
       "codex_enabled": true
     },
     {

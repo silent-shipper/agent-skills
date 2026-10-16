@@ -26,12 +26,18 @@ For a long task, record its class, requested endpoint, observable done predicate
 and proof in the existing task plan. Keep completed decisions and evidence there;
 refresh them only when inputs change. Small localized tasks need no extra ledger.
 
+- Ambiguous or high-stakes request, or asked to confirm the prompt: use `sharpen`.
+- Resuming work or learning from past sessions: use `recall`.
 - Read-only explanation: use `how`; return the answer without implementation.
 - Feature or bug: ground the affected flow, design only uncertain boundaries,
   implement the smallest complete unit and prove its requested behavior.
 - Refactor: establish baseline parity and a concrete maintenance benefit.
 - Measured performance or reliability claim: use `benchmark-checklist`.
-- Review or shipping: use `interrogate` or `ship` for the requested endpoint.
+- Review or shipping: use `interrogate` or `ship` for the requested endpoint;
+  use `blast-radius` for a small diff whose wider impact is untrusted.
+- Repeated correction: use `correct` to enforce it in structure, not more prose.
+- Factual forks (behavior, timing, output) are not the user's to answer: prototype
+  and let the result decide. Ask only for product or preference calls.
 
 Reuse a suitable isolated checkout. A new independent task may start from the
 current default branch; PR fixes and dependent work use their actual target/base.
