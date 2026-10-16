@@ -11,7 +11,11 @@ actual commands, checks and contribution rules.
 ## Scope and authorization
 
 Confirm the checkout, branch, intended diff and requested endpoint from the
-session. Existing explicit authorization persists: "ship it", "push this" and
+session. Ship only to the repository the user named; "ship to main" is scoped to
+that repository. Changing another repository needs the user's confirmation; the
+installed `agent-guard` hook asks before a push, PR create, edit or merge that
+targets a repository other than the session's. A request to resolve, ship or
+merge a stack covers every PR in that stack, root first, not only the current one. Existing explicit authorization persists: "ship it", "push this" and
 "commit and push" authorize the corresponding actions for this scope. Continue
 without a second push-confirmation question. A local-only or draft-only request
 remains a checkpoint; if shipping was not authorized, prepare the concrete result
@@ -40,6 +44,8 @@ the user authorized that action. Do not add a `Co-Authored-By` trailer.
   of the same source revision; add a before screenshot when readily available.
   If capture is unavailable, state the concrete limitation and continue the
   remaining shipping work.
+- Before committing, report the diff size (`git diff --stat`). More than ~40
+  files or four feature folders needs a stated reason or a split.
 - Commit in coherent pieces with concise conventional messages explaining the
   problem or resulting behavior. Do not split a small change into arbitrary
   code/test commits.
@@ -64,6 +70,8 @@ field labels. Put repository-required details in the relevant sections:
   **After:** <the same result, changed>
 
 **Checks:** <comma-separated passing checks; pending CI>
+
+**Browser:** <verified <evidence link> | not run: <reason> | n/a: <why no UI>>
 
 **Gaps:** <optional: one line of untested or unproven behavior>
 
@@ -107,6 +115,11 @@ Keep Evidence scannable for a reviewer who reads it once:
 - Leave out process narration: verification job IDs, tool or agent names,
   review rounds, "source-matched"/"VERIFIED" status, hooks or harness details
   used to collect proof, and file-match confirmations.
+- `Browser:` states whether the changed user flow was exercised in a real
+  browser, with the evidence link, or why not. A "not run" line is honest; a
+  missing line is a claim of proof without proof. The `agent-guard` hook denies
+  `gh pr create`/`gh pr edit` bodies without an Evidence section containing an
+  After result, `Checks:` and `Browser:` lines, or with unfilled placeholders.
 - Put at most one line of unproven behavior under `Gaps:`; move rollout risk
   to Merge Danger. Omit `Gaps:` when there are none.
 - If a detail does not change whether a reviewer would merge, drop it.
@@ -120,6 +133,8 @@ Example:
   **After:** All 10 pass.
 
 **Checks:** auth/wallet suite 140/140, typecheck, build, Biome. CI pending.
+
+**Browser:** verified https://github.com/org/repo/pull/12#issuecomment-1 (login on preview)
 
 **Gaps:** Live Coinbase signing not tested.
 ```

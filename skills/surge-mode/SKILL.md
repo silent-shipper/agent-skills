@@ -26,18 +26,31 @@ For a long task, record its class, requested endpoint, observable done predicate
 and proof in the existing task plan. Keep completed decisions and evidence there;
 refresh them only when inputs change. Small localized tasks need no extra ledger.
 
-- Ambiguous or high-stakes request, or asked to confirm the prompt: use `sharpen`.
-- Resuming work or learning from past sessions: use `recall`.
-- Read-only explanation: use `how`; return the answer without implementation.
-- Feature or bug: ground the affected flow, design only uncertain boundaries,
-  implement the smallest complete unit and prove its requested behavior.
-- Refactor: establish baseline parity and a concrete maintenance benefit.
-- Measured performance or reliability claim: use `benchmark-checklist`.
-- Review or shipping: use `interrogate` or `ship` for the requested endpoint;
-  use `blast-radius` for a small diff whose wider impact is untrusted.
-- Repeated correction: use `correct` to enforce it in structure, not more prose.
-- Factual forks (behavior, timing, output) are not the user's to answer: prototype
-  and let the result decide. Ask only for product or preference calls.
+Each trigger below is mandatory when it fires. Read the named skill in full
+before acting on it, and in the reply name each skill that changed a decision
+and the decision it changed. Load only skills whose trigger fired.
+
+| When | Use |
+| --- | --- |
+| Asked to confirm the prompt, or the request is ambiguous or high-stakes | `sharpen`, then wait for confirmation |
+| Resuming work, "catch me up", or learning from past sessions | `recall` |
+| How code works, where behavior lives | `how` (read-only) |
+| Why code is shaped this way, before changing defensive or odd code | `why` |
+| Code crossing a module boundary, or new ownership | `architect` before implementing |
+| Expensive decision with real alternatives, or "arena this" | `arena` |
+| Independent slices, coverage lanes or experiments | `swarm` |
+| A fork answerable by running something (behavior, timing, output) | prototype it and let the result decide; ask only product or preference calls |
+| Supported Defuse feature or bug | `create-verification` for proof |
+| Measured performance or reliability claim | `benchmark-checklist` before reporting |
+| Small diff whose wider impact is untrusted | `blast-radius` |
+| Contested design, or before shipping a risky change | `interrogate` |
+| Maintainability audit or "thermo-nuclear" | `thermo-nuclear-code-quality-review` |
+| Same correction a second time, or "make this impossible" | `correct`: enforce it in structure, not prose |
+| Long, unattended or multi-phase run | `show-me-your-work` decision log |
+| Commit, push, PR, CI follow-through | `ship` |
+| Any user-facing prose: reply, PR body, review comment | `unslop`, and `breakdown` for change summaries |
+| Asked for a guided review | `review-guide` |
+| Session learnings or skill improvements | `reflect` |
 
 Reuse a suitable isolated checkout. A new independent task may start from the
 current default branch; PR fixes and dependent work use their actual target/base.
@@ -54,9 +67,7 @@ setup and does not need a separate skill.
 - For refactors, compare against keeping the current implementation. Prove a
   meaningful maintenance benefit while preserving behavior and UI/UX. Recommend
   leaving it alone when the benefit does not justify the change.
-- Use `architect` for uncertain ownership or boundaries; use `arena` when
-  explicitly requested or independent alternatives justify their cost. A combined
-  request shares one design comparison. Reuse completed grounding and proof, and
+- A combined `architect`/`arena` request shares one design comparison. Reuse completed grounding and proof, and
   rerun only when new requirements or evidence change the decision. Prove the
   smallest useful integration before proposing a broader redesign.
 - Prefer self-explanatory code. Keep narration comments and incidental docs or
@@ -85,7 +96,7 @@ setup and does not need a separate skill.
 
 - Lead with the decision, outcome, or blocker. Explain what changes, why it is
   worth doing, and what was verified. Use plain language and cut process narration.
-- Use `breakdown` for change summaries and code/test file counts. Label estimates.
+- Use `breakdown`'s fixed shape for change summaries and file counts. Label estimates.
   Explain architecture with a short before/after when useful. Keep detailed
   research behind the concise answer when requested.
 - Keep project rules and workflow mechanics in their existing owners. Load only

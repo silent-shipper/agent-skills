@@ -202,6 +202,7 @@ def managed_paths(skills):
     for path in (".agents/surge-defaults.md", ".codex/AGENTS.md", ".claude/CLAUDE.md"):
         paths[HOME_DIR / path] = REPO / "surge-defaults.md"
     paths[HOME_DIR / ".agents/check-skills.py"] = REPO / "scripts/check-skills.py"
+    paths[HOME_DIR / ".agents/agent-guard.py"] = REPO / "scripts/agent-guard.py"
     if (HOME_DIR / ".claude-alt").is_dir():
         paths[HOME_DIR / ".claude-alt/CLAUDE.md"] = REPO / "surge-defaults.md"
     return paths
@@ -227,6 +228,23 @@ def skill_config(text, skills, retired=()):
         + '\nenabled = ' + str(s["codex_enabled"]).lower() + '\n' for s in skills
     )
     return text.rstrip() + "\n\n" + additions
+
+
+def register_guard():
+    command = str(HOME_DIR / ".agents/agent-guard.py")
+    for home in (".claude", ".claude-alt"):
+        if home == ".claude-alt" and not (HOME_DIR / home).is_dir():
+            continue
+        path = HOME_DIR / home / "settings.json"
+        settings = json.loads(path.read_text()) if path.exists() else {}
+        hooks = settings.setdefault("hooks", {}).setdefault("PreToolUse", [])
+        if any(h.get("command") == command for entry in hooks for h in entry.get("hooks", [])):
+            continue
+        hooks.append({"matcher": "Bash", "hooks": [{"type": "command", "command": command}]})
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name("settings.json.skill-config-tmp")
+        temporary.write_text(json.dumps(settings, indent=2) + "\n")
+        temporary.replace(path)
 
 
 def backup(path, directory):
@@ -258,6 +276,7 @@ def install(synced=False):
         temporary.write_text(new)
         temporary.chmod(0o600)
         temporary.replace(config)
+    register_guard()
     try:
         check(installation_only=True)
     except SystemExit:

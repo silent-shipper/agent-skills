@@ -128,6 +128,17 @@ class SkillInstallationTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, '0 valid roots'):
                     skills.toolkit_root()
 
+    def test_install_registers_agent_guard_once_and_keeps_settings(self):
+        settings = self.home / ".claude/settings.json"
+        settings.parent.mkdir(parents=True)
+        settings.write_text(json.dumps({"model": "opus", "hooks": {"Stop": []}}))
+        skills.install()
+        skills.install()
+        data = json.loads(settings.read_text())
+        commands = [h["command"] for e in data["hooks"]["PreToolUse"] for h in e["hooks"]]
+        self.assertEqual(commands, [str(self.home / ".agents/agent-guard.py")])
+        self.assertEqual((data["model"], data["hooks"]["Stop"]), ("opus", []))
+
     def test_installed_receipt_records_content_identity(self):
         skills.install()
         state = json.loads((self.home / '.agents/skill-sync-status.json').read_text())
@@ -199,6 +210,7 @@ class SkillInstallationTests(unittest.TestCase):
         (origin / 'scripts').mkdir()
         shutil.copy2(skills.REPO / 'scripts/skills.py', origin / 'scripts/skills.py')
         shutil.copy2(skills.REPO / 'scripts/check-skills.py', origin / 'scripts/check-skills.py')
+        shutil.copy2(skills.REPO / 'scripts/agent-guard.py', origin / 'scripts/agent-guard.py')
         shutil.copytree(skills.REPO / 'skills/architect', origin / 'skills/architect')
         (origin / 'manifest.json').write_text(json.dumps({'version': 1, 'skills': [{'name': 'architect', 'codex_enabled': True}]}))
         (origin / 'surge-defaults.md').write_text('Shared defaults\n')

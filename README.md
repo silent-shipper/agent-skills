@@ -1,6 +1,6 @@
 # Shared agent skills
 
-Private source of truth for Surge's 22 enabled personal skills and coding defaults on the
+Private source of truth for Surge's 25 enabled personal skills and coding defaults on the
 MacBook Pro and Mac mini. Codex and Claude use links to the same checkout.
 
 ## Current setup
@@ -11,8 +11,8 @@ device only after publication and a successful sync:
 
 | Device | Codex | Claude Code |
 | --- | --- | --- |
-| MacBook Pro | 22 enabled personal skills | The same 22 personal skills |
-| Mac mini | 22 enabled personal skills | The same 22 personal skills |
+| MacBook Pro | 25 enabled personal skills | The same 25 personal skills |
+| Mac mini | 25 enabled personal skills | The same 25 personal skills |
 
 Codex, Claude Code, and an existing Claude Alt home share `surge-defaults.md`.
 Credentials and provider login/configuration are never synced. An Alt home is
@@ -56,7 +56,10 @@ text, so installed hashes do not prove which text a running agent already read.
 - `review-guide` — Capy-style guided review page for a change
 - `ship` — commit, push and follow PR work
 - `surge-mode` — apply Surge's working style
+- `show-me-your-work` — decision log for long or unattended runs
 - `swarm` — parallel independent work
+- `unslop` — cut AI tells from prose
+- `why` — cited design rationale from history and available sources
 - `thermo-nuclear-code-quality-review` — intensive code quality review
 
 ### Previously disabled, now excluded

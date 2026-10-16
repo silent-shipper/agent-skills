@@ -78,6 +78,10 @@
       "codex_enabled": true
     },
     {
+      "name": "show-me-your-work",
+      "codex_enabled": true
+    },
+    {
       "name": "surge-mode",
       "codex_enabled": true
     },
@@ -87,6 +91,14 @@
     },
     {
       "name": "thermo-nuclear-code-quality-review",
+      "codex_enabled": true
+    },
+    {
+      "name": "unslop",
+      "codex_enabled": true
+    },
+    {
+      "name": "why",
       "codex_enabled": true
     }
   ]

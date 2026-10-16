@@ -30,6 +30,9 @@ requested scope and checkpoint; project guidance supplies domain rules.
   those actions for the agreed scope. Honor local-only checkpoints. When CI
   follow-through is requested, verify the latest PR head and finish authorized
   repairs; identify a concrete external blocker if completion requires new scope.
+  Standing grants: spending from the funded MetaMask test account for
+  verification, and finishing every PR when asked to resolve a stack. Shipping
+  is scoped to the repository the user named; ask before changing another.
 - Lead with the result or decision. For a plan, implementation or PR review,
   automatically give a short breakdown: what the change does, why it is worth
   doing, meaningful proof and remaining gaps. Include actual changed-file counts

@@ -48,4 +48,9 @@ Return:
 6. **Dismissed** — rejected claims and why.
 7. **Agreement map** — consensus, divergence, and what it implies.
 
+When findings will be posted to a PR, first fetch existing review and issue
+comments and drop findings already raised. Each posted comment names the user
+impact in one sentence, cites the line, and is phrased as a suggestion ("maybe
+we should…"), not a demand. Post nits only as short bullets in an approval.
+
 Lead with the verdict and actionable findings; omit empty categories and keep the agreement map compact unless disagreement matters. When no actionable findings survive validation, say so plainly. After authorized fixes, check the changed paths and affected contracts. Repeat the full review only when the new diff or evidence requires it; a completed review with no confirmed blocker is sufficient.
