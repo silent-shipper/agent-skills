@@ -44,8 +44,6 @@ the user authorized that action. Do not add a `Co-Authored-By` trailer.
   of the same source revision; add a before screenshot when readily available.
   If capture is unavailable, state the concrete limitation and continue the
   remaining shipping work.
-- Before committing, report the diff size (`git diff --stat`). More than ~40
-  files or four feature folders needs a stated reason or a split.
 - Commit in coherent pieces with concise conventional messages explaining the
   problem or resulting behavior. Do not split a small change into arbitrary
   code/test commits.
