@@ -44,7 +44,9 @@ Files: N total — T tests, C code
   paths or commands unless the user needs one to act.
 - Never mark something done that still waits on the user. Never invent a
   number or a link.
-- One inline screenshot only when the change is visible. No diagrams unless
+- When completed work changed visible UI, show one inline screenshot of the
+  result, captured from the running app after the change. If capture failed,
+  say so in one line under **Gaps**. No other images, and no diagrams unless
   asked.
 - `Files:` only for completed changes, from the actual diff; for a plan write
   `Files (estimated): ~N total — ~T tests, ~C code`. Count every non-test file

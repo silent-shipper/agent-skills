@@ -38,7 +38,9 @@ requested scope and checkpoint; project guidance supplies domain rules.
   worth doing, meaningful proof, remaining gaps and what waits on the user.
   Include actual changed-file counts for completed changes and clearly labeled
   estimates for plans. Keep it under about 80 words with at most 3 change
-  bullets; give more detail only when the user asks.
+  bullets; give more detail only when the user asks. When finished work changed
+  visible UI, include an inline screenshot of the result, or state why capture
+  failed.
 
 Personal skills with the same name share one maintained source through aliases.
 At the start of coding work, run `python3 ~/.agents/skill-config/scripts/skills.py ready`
