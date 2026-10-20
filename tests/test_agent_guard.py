@@ -15,14 +15,13 @@ PROVEN = """## Summary
 
 Fix.
 
-## Evidence
+## Screenshots
 
-- **Before:** Swap quote failed.
-  **After:** Swap settles on the preview.
+![Swap settled](https://github.com/org/repo/blob/pr-assets/fix/after.png?raw=true)
 
-**Checks:** typecheck, 12 tests.
+## Verified in browser
 
-**Browser:** verified https://example.com/run/1
+- Swap settles on the preview.
 
 ## Merge Danger
 """
@@ -70,11 +69,15 @@ class AgentGuardTests(unittest.TestCase):
         body.write_text(UNPROVEN)
         result = self.decide(f"gh pr edit 784 --body-file {body}", self.app)
         self.assertEqual(result[0], "deny")
-        self.assertIn("## Evidence", result[1])
+        self.assertIn("## Verified in browser", result[1])
 
     def test_unfilled_template_is_denied(self):
-        body = PROVEN.replace("verified https://example.com/run/1", "verified <link>")
+        body = PROVEN.replace("- Swap settles on the preview.", "- <one behavior checked in a real browser>")
         self.assertIn("placeholder", self.decide("gh pr create --body " + shlex.quote(body), self.app)[1])
+
+    def test_empty_browser_section_is_denied(self):
+        body = PROVEN.replace("- Swap settles on the preview.\n", "")
+        self.assertIn("no bullet", self.decide("gh pr create --body " + shlex.quote(body), self.app)[1])
 
     def test_proven_pr_is_allowed(self):
         body = self.root / "body.md"

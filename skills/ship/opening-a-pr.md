@@ -12,16 +12,13 @@ field labels. Put repository-required details in the relevant sections:
 
 <diagram, diff-sketch, or tree>
 
-## Evidence
+## Screenshots
 
-- **Before:** <one observable result>
-  **After:** <the same result, changed>
+<only when the UI changed: one captioned image per changed screen or state>
 
-**Checks:** <comma-separated passing checks; pending CI>
+## Verified in browser
 
-**Browser:** <verified <evidence link> | not run: <reason> | n/a: <why no UI>>
-
-**Gaps:** <optional: one line of untested or unproven behavior>
+- <one behavior checked in a real browser, in plain words>
 
 ## Merge Danger
 
@@ -35,12 +32,11 @@ field labels. Put repository-required details in the relevant sections:
 ```
 
 Keep prose brief and use the repository's domain language (`GLOSSARY.md` when
-present). Choose the smallest visual that explains the change. Use observed
-screenshots or exact checks and results as evidence; state missing baseline
-evidence and pending checks explicitly. Never invent a before/after result.
+present). Choose the smallest visual that explains the change. Never invent a
+result or a screenshot.
 
 Open with the risk line so a reviewer knows in one glance how much attention
-the PR needs. Use the evidence and Merge Danger to pick the level:
+the PR needs. Use the browser proof and Merge Danger to pick the level:
 
 - **Ultra low:** no user-visible behavior change, two-way door, plain revert,
   proven by tests (moves, renames, dead-code removal, refactors with parity).
@@ -54,43 +50,63 @@ The clause names the reason in plain words, for example
 change, plain revert.` Keep it consistent with Merge Danger; never round a
 risk down to make the PR look easier.
 
-Keep Evidence scannable for a reviewer who reads it once:
+### Screenshots
 
-- Use one to three Before/After pairs, each about one behavior a reviewer
-  cares about, in one short sentence per side. Lead with the number or outcome.
-- Put lint, typecheck, build, formatting and suite counts on the single
-  `Checks:` line, not in the pairs.
-- Leave out process narration: verification job IDs, tool or agent names,
-  review rounds, "source-matched"/"VERIFIED" status, hooks or harness details
-  used to collect proof, and file-match confirmations.
-- `Browser:` states whether the changed user flow was exercised in a real
-  browser, with the evidence link, or why not. A "not run" line is honest; a
-  missing line is a claim of proof without proof. The `agent-guard` hook denies
-  `gh pr create`/`gh pr edit` bodies without an Evidence section containing an
-  After result, `Checks:` and `Browser:` lines, or with unfilled placeholders.
-- Put at most one line of unproven behavior under `Gaps:`; move rollout risk
-  to Merge Danger. Omit `Gaps:` when there are none.
-- If a detail does not change whether a reviewer would merge, drop it.
+Include `## Screenshots` whenever the PR changes anything visible in the UI;
+omit the section only when nothing visible changed. Show the resulting state of
+each changed screen or state, with a short caption, and add the before image
+when it is readily available. Use the screenshots captured while verifying this
+head.
+
+`gh` cannot attach images, so publish them to the repository's `pr-assets`
+branch, which holds only images and never merges:
+
+```bash
+if git fetch origin pr-assets 2>/dev/null; then
+  git worktree add -B pr-assets /tmp/pr-assets origin/pr-assets
+else
+  git worktree add --orphan -b pr-assets /tmp/pr-assets
+fi
+mkdir -p /tmp/pr-assets/<branch> && cp <screenshots> /tmp/pr-assets/<branch>/
+git -C /tmp/pr-assets add <branch> && git -C /tmp/pr-assets commit -m "assets: <branch>"
+git -C /tmp/pr-assets push origin pr-assets && git worktree remove /tmp/pr-assets
+```
+
+Reference each image as
+`![<caption>](https://github.com/<owner>/<repo>/blob/pr-assets/<branch>/<file>.png?raw=true)`
+so it renders for anyone who can read the repository. If publishing is
+impossible, say so in one line under `## Screenshots` instead of dropping the
+section.
+
+### Verified in browser
+
+List only what was checked in a real browser, one short bullet per behavior, in
+words a reviewer understands without the code. Lead with the outcome. Leave
+out tests, lint, typecheck, build, CI, job IDs, tool or agent names and how the
+proof was collected. When nothing was checked in a browser, write one bullet
+instead: `- Not verified in browser: <reason>` or `- n/a: no UI or user flow
+changed`. The `agent-guard` hook denies `gh pr create`/`gh pr edit` bodies
+without a `## Verified in browser` section containing a bullet, or with
+unfilled placeholders.
 
 Example:
 
 ```markdown
-- **Before:** Cold mobile login took 23.4 s.
-  **After:** 18.3 s (22% faster).
-- **Before:** 9 of 10 new regression tests failed.
-  **After:** All 10 pass.
+## Screenshots
 
-**Checks:** auth/wallet suite 140/140, typecheck, build, Biome. CI pending.
+![Swap status after success](https://github.com/org/repo/blob/pr-assets/feat-swap-summary/after.png?raw=true)
 
-**Browser:** verified https://github.com/org/repo/pull/12#issuecomment-1 (login on preview)
+## Verified in browser
 
-**Gaps:** Live Coinbase signing not tested.
+- A completed swap collapses its steps into "Swap complete".
+- A failed swap still shows each step and the error.
+- The status card fits a 375 px mobile screen.
 ```
 
-For relevant UI/design changes, include the resulting screenshot in Evidence
-when it can be shared using an accessible image attachment or URL.
-Explain reversibility, affected users/consumers and material failure, migration
-or rollback risks under Merge Danger, with detail proportional to the change.
+Put untested behavior that could change a merge decision in the Merge Danger
+description. Explain reversibility, affected users/consumers and material
+failure, migration or rollback risks under Merge Danger, with detail
+proportional to the change.
 
 For a multiline body, write the exact text to a temporary file and use
 `gh pr create --body-file <file>` or `gh pr edit --body-file <file>`.

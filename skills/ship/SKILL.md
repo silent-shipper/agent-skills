@@ -39,11 +39,11 @@ the user authorized that action. Do not add a `Co-Authored-By` trailer.
 - Fix supported failures within the authorized scope and reverify. Preserve
   test intent. Add or update regression coverage when it catches a demonstrated
   bug or a non-obvious durable behavior; avoid filler tests.
-- When a visible UI or design change benefits from visual review, capture and
-  inspect a screenshot of the resulting app. Reuse screenshots from verification
-  of the same source revision; add a before screenshot when readily available.
-  If capture is unavailable, state the concrete limitation and continue the
-  remaining shipping work.
+- When anything visible in the UI changes, capture and inspect a screenshot of
+  each changed screen or state; they go in the PR description. Reuse
+  screenshots from verification of the same source revision; add a before
+  screenshot when readily available. If capture is unavailable, state the
+  concrete limitation and continue the remaining shipping work.
 - Commit in coherent pieces with concise conventional messages explaining the
   problem or resulting behavior. Do not split a small change into arbitrary
   code/test commits.
@@ -55,7 +55,7 @@ and push") runs both, with the second in `drive` mode. "Open a PR" alone, or a
 draft-only request, stops after the first.
 
 1. [Open or update the PR](opening-a-pr.md): push, the exact PR-body format,
-   risk, evidence and Merge Danger.
+   risk, screenshots, browser verification and Merge Danger.
 2. [Babysit the PR](babysit.md): declare a mode, work the lowest unmerged PR
    first, classify CI failures before any retry, and triage review feedback.
 

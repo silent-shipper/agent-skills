@@ -49,19 +49,16 @@ def option(words, *names):
 
 
 def evidence_errors(body):
-    section = re.search(r"(?ms)^## Evidence\s*$(.*?)(?=^## |\Z)", body)
+    section = re.search(r"(?ms)^## Verified in browser\s*$(.*?)(?=^## |\Z)", body)
     if not section:
-        return ["missing `## Evidence` section"]
-    text = section[1]
+        return ["missing `## Verified in browser` section"]
     errors = []
-    if not re.search(r"\*\*After:\*\*\s*\S", text):
-        errors.append("no `**After:**` result")
-    if not re.search(r"\*\*Checks:\*\*\s*\S", text):
-        errors.append("no `**Checks:**` line")
-    if not re.search(r"\*\*Browser:\*\*\s*(verified|not run|n/a)\b", text, re.I):
-        errors.append("no `**Browser:** verified <link> | not run: <reason> | n/a` line")
-    if PLACEHOLDER.search(text):
-        errors.append("unfilled template placeholder " + PLACEHOLDER.search(text)[0])
+    if not re.search(r"(?m)^\s*[-*]\s+\S", section[1]):
+        errors.append("no bullet under `## Verified in browser`")
+    for heading in ("Screenshots", "Verified in browser"):
+        part = re.search(rf"(?ms)^## {heading}\s*$(.*?)(?=^## |\Z)", body)
+        if part and PLACEHOLDER.search(part[1]):
+            errors.append("unfilled template placeholder " + PLACEHOLDER.search(part[1])[0])
     return errors
 
 
@@ -101,7 +98,7 @@ def decide(payload):
                 errors = evidence_errors(body)
                 if errors:
                     return ("deny", "PR body fails the ship evidence gate: " + "; ".join(errors)
-                            + ". Fill Evidence per the ship skill before opening or updating the PR.")
+                            + ". Fill Screenshots and Verified in browser per the ship skill before opening or updating the PR.")
     return None
 
 
