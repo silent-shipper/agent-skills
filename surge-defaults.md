@@ -37,8 +37,8 @@ requested scope and checkpoint; project guidance supplies domain rules.
   automatically give a short `status` catch-up: what the change does, why it is
   worth doing, meaningful proof, remaining gaps and what waits on the user.
   Include actual changed-file counts for completed changes and clearly labeled
-  estimates for plans. Keep small
-  answers to roughly 4–6 short bullets; expand when the work requires it.
+  estimates for plans. Keep it under about 80 words with at most 3 change
+  bullets; give more detail only when the user asks.
 
 Personal skills with the same name share one maintained source through aliases.
 At the start of coding work, run `python3 ~/.agents/skill-config/scripts/skills.py ready`

@@ -57,7 +57,7 @@ text, so installed hashes do not prove which text a running agent already read.
 - `ship` — commit, push, open the PR, then babysit CI and review feedback
 - `surge-mode` — apply Surge's working style: playbooks, principles and routing
 - `show-me-your-work` — decision log for long or unattended runs
-- `status` — plain catch-up on what changed and what waits on the user
+- `status` — ultra-concise catch-up on what changed and what waits on the user
 - `swarm` — parallel independent work
 - `unslop` — cut AI tells from prose
 - `why` — cited design rationale from history and available sources
