@@ -283,6 +283,40 @@ class SkillInstallationTests(unittest.TestCase):
         self.assertIn('Candidate installs', result.stderr)
         self.assertFalse((self.home / '.codex/skills').exists())
 
+    def test_drift_lists_upstream_commits_after_each_pin(self):
+        pinned = {s["name"]: s["upstream"] for s in skills.manifest() if "upstream" in s}
+        how = pinned["how"]
+
+        def gh(*args, quiet=False):
+            if "/commits/" in args[2]:
+                return json.dumps({"commit": {"committer": {"date": "2026-10-11T00:00:00Z"}}})
+            if "path=" + how["paths"][0] in args:
+                return json.dumps([{"sha": "a" * 40, "commit": {"message": "pstack: tighten how\n\nbody"}},
+                                   {"sha": how["commit"], "commit": {"message": "the pin itself"}}])
+            return "[]"
+
+        output = io.StringIO()
+        with patch.object(skills, "run", gh), contextlib.redirect_stdout(output):
+            skills.drift()
+        report = json.loads(output.getvalue())
+        self.assertEqual(set(report), set(pinned))
+        self.assertEqual(report["how"]["changes"], ["aaaaaaa pstack: tighten how"])
+        self.assertEqual(report["unslop"]["changes"], [])
+
+    def test_manifest_rejects_an_upstream_pin_that_is_not_a_full_commit(self):
+        repo = Path(self.directory.name) / "repo"
+        (repo / "skills/demo").mkdir(parents=True)
+        (repo / "skills/demo/SKILL.md").write_text("---\nname: demo\ndescription: Demo.\n---\n")
+        entry = {"name": "demo", "codex_enabled": True,
+                 "upstream": {"repo": "cursor/plugins", "commit": "88d4751", "paths": ["pstack/skills/demo"]}}
+        (repo / "manifest.json").write_text(json.dumps({"version": 1, "skills": [entry]}))
+        with patch.object(skills, "REPO", repo):
+            with self.assertRaisesRegex(AssertionError, "Invalid upstream pin: demo"):
+                skills.manifest()
+            entry["upstream"]["commit"] = "8" * 40
+            (repo / "manifest.json").write_text(json.dumps({"version": 1, "skills": [entry]}))
+            self.assertEqual(skills.manifest(), [entry])
+
 
 if __name__ == "__main__":
     unittest.main()

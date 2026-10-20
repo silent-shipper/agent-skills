@@ -11,19 +11,36 @@
     },
     {
       "name": "benchmark-checklist",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "00b14f1df36b32a8dd1529324a3a459f6563b127",
+        "paths": [
+          "pstack/skills/benchmark-checklist"
+        ]
+      }
     },
     {
       "name": "blast-radius",
-      "codex_enabled": true
-    },
-    {
-      "name": "breakdown",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "df581122cde17e6e27686b5a448bde23e4ad4318",
+        "paths": [
+          "pstack/skills/blast-radius"
+        ]
+      }
     },
     {
       "name": "correct",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "e5136d82418d2db3165ea1050d17577cd618cc05",
+        "paths": [
+          "pstack/skills/correct"
+        ]
+      }
     },
     {
       "name": "create-verification",
@@ -35,7 +52,14 @@
     },
     {
       "name": "how",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "08bd59b37834550f5e8fa0bb5e8852204a7534cf",
+        "paths": [
+          "pstack/skills/how"
+        ]
+      }
     },
     {
       "name": "improve-codebase-architecture",
@@ -51,11 +75,25 @@
     },
     {
       "name": "recall",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "ce649c03ac3b75b6ae80cbd15b7e2c536caedb5a",
+        "paths": [
+          "pstack/skills/recall"
+        ]
+      }
     },
     {
       "name": "reflect",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "00b14f1df36b32a8dd1529324a3a459f6563b127",
+        "paths": [
+          "pstack/skills/reflect"
+        ]
+      }
     },
     {
       "name": "remote-session",
@@ -71,19 +109,76 @@
     },
     {
       "name": "sharpen",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "79afd75d5bd51383fbb526b72f36db03180b8301",
+        "paths": [
+          "pstack/skills/sharpen",
+          "pstack/skills/in-your-own-words"
+        ]
+      }
     },
     {
       "name": "ship",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "88d47514b82e7c44f00f2b2a72ff6dd12158038c",
+        "paths": [
+          "pstack/skills/poteto-mode/playbooks/babysit.md"
+        ]
+      }
     },
     {
       "name": "show-me-your-work",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "ce649c03ac3b75b6ae80cbd15b7e2c536caedb5a",
+        "paths": [
+          "pstack/skills/show-me-your-work"
+        ]
+      }
+    },
+    {
+      "name": "status",
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "88d47514b82e7c44f00f2b2a72ff6dd12158038c",
+        "paths": [
+          "pstack/skills/ketchup",
+          "pstack/skills/bro"
+        ]
+      }
     },
     {
       "name": "surge-mode",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "88d47514b82e7c44f00f2b2a72ff6dd12158038c",
+        "paths": [
+          "pstack/skills/poteto-mode/SKILL.md",
+          "pstack/skills/poteto-mode/playbooks/investigation.md",
+          "pstack/skills/poteto-mode/playbooks/bug-fix.md",
+          "pstack/skills/poteto-mode/playbooks/feature.md",
+          "pstack/skills/poteto-mode/playbooks/refactoring.md",
+          "pstack/skills/poteto-mode/playbooks/session-pickup.md",
+          "pstack/skills/principle-fix-root-causes",
+          "pstack/skills/principle-attack-the-premise",
+          "pstack/skills/principle-prove-it-works",
+          "pstack/skills/principle-test-behavior-not-implementation",
+          "pstack/skills/principle-model-the-domain",
+          "pstack/skills/principle-boundary-discipline",
+          "pstack/skills/principle-type-system-discipline",
+          "pstack/skills/principle-subtract-before-you-add",
+          "pstack/skills/principle-migrate-callers-then-delete-legacy-apis",
+          "pstack/skills/principle-sequence-verifiable-units",
+          "pstack/skills/principle-guard-the-context-window"
+        ]
+      }
     },
     {
       "name": "swarm",
@@ -95,11 +190,25 @@
     },
     {
       "name": "unslop",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "bc697d0a5a163cec979e362b601e36f5616083fd",
+        "paths": [
+          "pstack/skills/unslop"
+        ]
+      }
     },
     {
       "name": "why",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "cursor/plugins",
+        "commit": "ce649c03ac3b75b6ae80cbd15b7e2c536caedb5a",
+        "paths": [
+          "pstack/skills/why"
+        ]
+      }
     }
   ]
 }

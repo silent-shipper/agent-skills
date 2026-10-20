@@ -41,7 +41,6 @@ text, so installed hashes do not prove which text a running agent already read.
 - `arena` — compare independent candidates
 - `benchmark-checklist` — qualify performance and reliability measurements
 - `blast-radius` — prove what a change could break beyond the diff
-- `breakdown` — concise change summaries
 - `correct` — turn repeated agent mistakes into enforced structure
 - `create-verification` — verify supported Defuse changes
 - `grill-to-goal` — clarify goals and decisions
@@ -54,9 +53,11 @@ text, so installed hashes do not prove which text a running agent already read.
 - `remote-session` — move worktree state and context to remote T3
 - `retro` — learn from completed work
 - `review-guide` — Capy-style guided review page for a change
-- `ship` — commit, push and follow PR work
-- `surge-mode` — apply Surge's working style
+- `sharpen` — restate the goal and expert approach, then confirm
+- `ship` — commit, push, open the PR, then babysit CI and review feedback
+- `surge-mode` — apply Surge's working style: playbooks, principles and routing
 - `show-me-your-work` — decision log for long or unattended runs
+- `status` — plain catch-up on what changed and what waits on the user
 - `swarm` — parallel independent work
 - `unslop` — cut AI tells from prose
 - `why` — cited design rationale from history and available sources
@@ -225,10 +226,16 @@ nonstandard checkout or resolves ambiguity. Nothing is cloned or copied. This
 proves local installation only; toolkit doctor and the live runner establish
 external login/account readiness.
 
-`how` and `benchmark-checklist` are focused adaptations of Lauren Tan's pstack at
-commit `1dcc2bacde73ddd284803b7af28164d0436198fc`. Each includes the original MIT
-license. Routing and structural correction ideas also inform `surge-mode` and
-`retro`; the full pstack orchestration is not installed.
+Several skills adapt Lauren Tan's MIT-licensed pstack (`cursor/plugins`). Each
+adapted skill's `upstream` entry in `manifest.json` pins the upstream commit and
+paths it was last reconciled with. List upstream changes since each pin with:
+
+```sh
+python3 ~/.agents/skill-config/scripts/skills.py drift
+```
+
+After reconciling a skill with upstream, move its pin to the reviewed commit. The
+full pstack orchestration is not installed.
 
 Before using the toolkit, run `skills.py toolkit-identity`. It records the native
 verifier revision/content digest and dirty state. An edited default checkout is

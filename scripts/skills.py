@@ -176,8 +176,32 @@ def manifest():
         field = re.search(r"^name:\s*(.*?)\s*$", front[1], re.M) if front else None
         assert field and field[1].strip("\"'") == name, name
         assert re.search(r"^description:\s*\S", front[1], re.M), name
+        upstream = skill.get("upstream")
+        assert upstream is None or (
+            set(upstream) == {"repo", "commit", "paths"} and re.fullmatch(r"[\w.-]+/[\w.-]+", upstream["repo"])
+            and re.fullmatch(r"[0-9a-f]{40}", upstream["commit"]) and upstream["paths"]
+            and all(re.fullmatch(r"[\w.-]+(/[\w.-]+)*", path) for path in upstream["paths"])), "Invalid upstream pin: " + name
         names.add(name)
     return data["skills"]
+
+
+def drift():
+    report = {}
+    for skill in manifest():
+        upstream = skill.get("upstream")
+        if not upstream:
+            continue
+        api = "repos/" + upstream["repo"]
+        try:
+            since = json.loads(run("gh", "api", api + "/commits/" + upstream["commit"]))["commit"]["committer"]["date"]
+            changes = {}
+            for path in upstream["paths"]:
+                commits = json.loads(run("gh", "api", "-X", "GET", api + "/commits", "-f", "path=" + path, "-f", "since=" + since, "-f", "per_page=100"))
+                changes.update((c["sha"], c["commit"]["message"].splitlines()[0]) for c in commits if c["sha"] != upstream["commit"])
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError) as error:
+            raise SystemExit("drift needs an authenticated gh CLI and network access: " + str(error)) from error
+        report[skill["name"]] = {"commit": upstream["commit"], "changes": [sha[:7] + " " + subject for sha, subject in changes.items()]}
+    print(json.dumps(report, indent=2))
 
 
 def retired_links(skills):
@@ -358,7 +382,7 @@ def auto_sync():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("install", "check", "ready", "sync", "edit", "publish", "enable-auto-sync", "toolkit-root", "toolkit-identity"))
+    parser.add_argument("command", choices=("install", "check", "ready", "sync", "edit", "publish", "enable-auto-sync", "toolkit-root", "toolkit-identity", "drift"))
     parser.add_argument("name", nargs="?")
     parser.add_argument("--peer")
     parser.add_argument("--candidate", action="store_true", help="Validate installation in a temporary HOME only")
@@ -370,6 +394,9 @@ def main():
             print(state["root"] if args.command == "toolkit-root" else json.dumps(state))
         except (ValueError, OSError, subprocess.SubprocessError) as error:
             raise SystemExit(str(error)) from error
+        return
+    if args.command == "drift":
+        drift()
         return
     if args.command == "edit":
         if not args.name:

@@ -34,9 +34,10 @@ requested scope and checkpoint; project guidance supplies domain rules.
   verification, and finishing every PR when asked to resolve a stack. Shipping
   is scoped to the repository the user named; ask before changing another.
 - Lead with the result or decision. For a plan, implementation or PR review,
-  automatically give a short breakdown: what the change does, why it is worth
-  doing, meaningful proof and remaining gaps. Include actual changed-file counts
-  for completed changes and clearly labeled estimates for plans. Keep small
+  automatically give a short `status` catch-up: what the change does, why it is
+  worth doing, meaningful proof, remaining gaps and what waits on the user.
+  Include actual changed-file counts for completed changes and clearly labeled
+  estimates for plans. Keep small
   answers to roughly 4–6 short bullets; expand when the work requires it.
 
 Personal skills with the same name share one maintained source through aliases.

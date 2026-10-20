@@ -1,6 +1,6 @@
 ---
 name: recall
-description: "Reconstruct working context or steering patterns from the user's past Claude Code/Codex transcripts, live git/gh state and the shared record, then return a tight cited brief. Use for 'recall my work on X', 'catch me up', 'where did I leave off', or 'learn how I steer agents'."
+description: "Reconstruct working context or steering patterns from the user's past Claude Code/Codex transcripts, live git/gh state and the shared record, then return a tight cited brief. Use for 'recall my work on X', 'catch me up' on earlier sessions, 'where did I leave off', or 'learn how I steer agents'."
 ---
 
 # Recall
@@ -12,9 +12,11 @@ and what to do next. Read only what in-scope threads need, then stop.
 
 ## Where transcripts live
 
-- Claude Code: `~/.claude/projects/<slug>/*.jsonl`. The slug is the cwd with `/`
-  and `.` replaced by `-`. One repo spans many slugs: the main checkout,
-  `-.t3-worktrees-<repo>-*` task worktrees and `-.t3-scratch-*` folders.
+- Claude Code: `~/.claude/projects/<slug>/*.jsonl`. The slug is the absolute cwd
+  with `/` and `.` replaced by `-`, so `/Users/me/.t3/worktrees/repo-x` becomes
+  `-Users-me--t3-worktrees-repo-x`. One repo spans many slugs: the main checkout,
+  `-Users-<user>--t3-worktrees-<repo>-*` task worktrees and
+  `-Users-<user>--t3-scratch-*` folders.
 - Codex: `~/.codex/sessions/**.jsonl`.
 - Extract user text with `jq`; skip tool results, sidechain/subagent messages and
   the current session.
