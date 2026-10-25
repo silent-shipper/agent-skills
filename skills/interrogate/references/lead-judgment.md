@@ -11,6 +11,7 @@ The lead filters rather than votes.
 - Reject "I would implement it differently" unless it identifies a concrete defect, maintenance cost, or violated project convention.
 - Reject premature abstractions that lack a second real use or clear invariant benefit.
 - Apply known timeline, migration, stack, and architectural context that reviewers lacked.
+- Keep merge mechanics out of findings: a needed rebase, conflicts, CI state and approvals. Mention them in one separate line only when the user also asked to merge. A conflict showing that two PRs change the same thing is a structural finding.
 
 ## Calibrate the verdict
 

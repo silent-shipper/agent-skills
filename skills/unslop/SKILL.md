@@ -1,6 +1,6 @@
 ---
 name: unslop
-description: Cut AI tells from any writing.
+description: Cut AI tells from any writing. Use for /unslop and when drafting or tightening a PR review comment, approval, review-thread reply or team message.
 ---
 
 # Unslop
@@ -61,3 +61,13 @@ Rule numbers are stable ids that other skills cite. A removed rule leaves a gap.
 31. **Prefer the plain word.** "utilize" and "leverage" become "use", "facilitate" becomes "help", "numerous" becomes "many", "in the event that" becomes "if". The fancier synonym is rarely clearer.
 32. **Mannered prose.** Metaphor or flourish where a literal phrase exists: aphorisms ("wire it or delete it"), rhetorical fragments for effect, personified code ("the plan holds it"), figurative verbs ("rides along", "stands on"), stock framing phrases. "A dial worth turning" becomes "a parameter worth varying". Say what you mean. Rule 26 covers the metaphor nouns.
 33. **Over-compression.** Dropped articles, verbless fragments, symbol-speak, and abbreviations that make the reader decode instead of read. "Parser rejects bad date → exit 2, no write" becomes "The parser rejects a bad date, exits with code 2, and writes nothing." Write whole sentences with their articles and verbs, and spell out arrows and abbreviations.
+
+## PR comments, approvals and team messages
+
+Write as the user, in first person, the way they would type it to a teammate.
+
+- Lead with the ask as a suggestion ("I think it'd be better to…, maybe we…?"), then the one fact that justifies it. Keep a single point under about 80 words. For several points, write one lead line and numbered one-sentence points, and stop after the last point.
+- An approval is one line: "Looks good" plus the one ask or the person to tag. Don't summarize the PR.
+- Leave out praise, sign-offs, FYIs, side findings, CI, bot, approval or rebase status, and how the work was checked or what wasn't, unless asked. A verification note lists only the behaviors checked in a real browser.
+- Link every PR you mention.
+- Show the exact text and wait for the go-ahead before posting, unless the user already said to post it.

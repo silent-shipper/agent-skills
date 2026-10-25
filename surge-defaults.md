@@ -30,6 +30,10 @@ requested scope and checkpoint; project guidance supplies domain rules.
   those actions for the agreed scope. Honor local-only checkpoints. When CI
   follow-through is requested, verify the latest PR head and finish authorized
   repairs; identify a concrete external blocker if completion requires new scope.
+  Before calling anything blocked or asking for access, logs or an earlier
+  decision, check what this Mac already has: the project's and related
+  automation repos' `.env` files, logged-in CLIs and MCP servers, and earlier
+  threads through `recall`. Name what you checked and what is still missing.
   Standing grants: spending from the funded MetaMask test account for
   verification, and finishing every PR when asked to resolve a stack. Shipping
   is scoped to the repository the user named; ask before changing another.

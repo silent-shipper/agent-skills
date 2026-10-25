@@ -40,7 +40,7 @@ Keep the `Act on` section small and decisive. Explain dismissals so the user can
 
 Return:
 
-1. **Intent** — the stated intent paragraph.
+1. **What it does** — two plain sentences without code names: what changes for someone using the app today (say "nothing reachable today" if so), and what prompted it (the linked issue or incident, or "not stated").
 2. **Scope and reviewers** — artifact reviewed and reviewer count.
 3. **Act on** — evidence, location, impact, and which reviewers raised it.
 4. **Consider** — evidence and tradeoff.
@@ -49,8 +49,8 @@ Return:
 7. **Agreement map** — consensus, divergence, and what it implies.
 
 When findings will be posted to a PR, first fetch existing review and issue
-comments and drop findings already raised. Each posted comment names the user
-impact in one sentence, cites the line, and is phrased as a suggestion ("maybe
-we should…"), not a demand. Post nits only as short bullets in an approval.
+comments and drop findings already raised. Each posted comment cites the line
+and follows unslop's rules for PR comments. Post nits only as short bullets in
+an approval.
 
 Lead with the verdict and actionable findings; omit empty categories and keep the agreement map compact unless disagreement matters. When no actionable findings survive validation, say so plainly. After authorized fixes, check the changed paths and affected contracts. Repeat the full review only when the new diff or evidence requires it; a completed review with no confirmed blocker is sufficient.

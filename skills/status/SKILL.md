@@ -27,7 +27,7 @@ irreversible action, or access you lack. Work you can still do is not one.
 
 - <What changed for the user, at most 12 words.>
 
-**Proof:** <how it was checked, one line.>
+**Proof:** <where each changed behavior ran and the result: real browser against real services, browser with named mocks, tests only, or not run.>
 **Gaps:** <only if material, one line.>
 **Needs you:** <the call and your pick, at most 20 words.> | Nothing.
 
@@ -36,14 +36,21 @@ Files: N total — T tests, C code
 
 - At most 80 words above **Needs you**. At most 3 change bullets; merge
   related changes and drop anything the user would not miss.
+- When the chat covers several PRs, replace the change bullets with one line
+  per PR under bold **Ready to merge** and **Fix before merging** groups,
+  leaving out an empty group. Each line is the linked PR, a few words naming
+  it, and the one thing it needs. These lines don't count toward the word cap.
 - One **Needs you** line per decision, never dropped to save words; combine
   decisions that share a call. Leave out low risk; state a real risk in a few
   words.
-- Plain words, like one person telling another. No headers beyond the shape,
-  no tables, no sub-bullets, no tool, skill or agent names, and no hashes,
-  paths or commands unless the user needs one to act.
+- Plain words, like one person telling another. No headers beyond the shape
+  and the PR groups, no tables, no sub-bullets, no tool, skill or agent names,
+  and no hashes, paths or commands unless the user needs one to act. Write
+  every PR as a link.
 - Never mark something done that still waits on the user. Never invent a
-  number or a link.
+  number or a link. Say verified or done in the outcome only when every
+  changed behavior passed where a user would exercise it, which for UI means a
+  real browser; otherwise name what did pass.
 - When completed work changed visible UI, show one inline screenshot of the
   result, captured from the running app after the change. If capture failed,
   say so in one line under **Gaps**. No other images, and no diagrams unless

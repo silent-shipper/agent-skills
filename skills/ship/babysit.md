@@ -57,8 +57,12 @@ gh api --paginate repos/<owner>/<repo>/pulls/<number>/comments
 ```
 
 - Record the PR head and evaluate its checks. Pending checks or no checks yet
-  are incomplete. Distinguish successful, skipped, cancelled and failed checks;
-  apply the repository's actual required-check policy.
+  are incomplete. Distinguish successful, skipped, cancelled and failed checks.
+  Treat the repository's required-check policy as a floor: merge only when
+  every check on the latest head has finished and none failed or was
+  cancelled; skipped is fine. A failed non-required check gets the one fresh
+  flake run; if it fails again, ask with its cause. Proceed past a wait or a
+  red check only on an explicit yes to that offer.
 - Poll at a sensible interval while providing concise updates. Do not block
   communication with a long sleep. A slow check alone is not a stopping reason.
 - At the first CI check, each subsequent poll, and just before completion,

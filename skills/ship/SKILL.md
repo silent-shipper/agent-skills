@@ -39,6 +39,12 @@ the user authorized that action. Do not add a `Co-Authored-By` trailer.
 - Fix supported failures within the authorized scope and reverify. Preserve
   test intent. Add or update regression coverage when it catches a demonstrated
   bug or a non-obvious durable behavior; avoid filler tests.
+- Before the first push of a behavior change, review the final diff with
+  `interrogate`, including one reviewer from a different provider family when
+  available. Fix confirmed Act-on findings, reverify, and review the changed
+  paths again. Stop after a round with no Act-on finding or after 3 rounds, and
+  list what remains in the result. Honor a requested round count. Skip this for
+  docs-only changes.
 - When anything visible in the UI changes, capture and inspect a screenshot of
   each changed screen or state; they go in the PR description. Reuse
   screenshots from verification of the same source revision; add a before
