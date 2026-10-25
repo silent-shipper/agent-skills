@@ -186,9 +186,12 @@ All browser checks and large unit suites use this shared queue across Codex and
 Claude; keep coding in parallel. Do not start verification servers before queue
 admission. Use `npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- run -- <command>`
 for other heavy checks; typecheck, unit test, lint and build commands use a separate work
-lane and do not wait behind browser runs. To wait for a running verification, call
-`queue -- wait <job-uuid>` (or `--app <apps/defuse-near>`) through the same npm prefix
-instead of polling `status`; exit 3 means still queued, so call it again. Use
+lane and do not wait behind browser runs. To wait for a queued job, run one
+`queue -- wait <job-uuid> --timeout-ms 7200000` (or `--app <apps/defuse-near>`) through
+the same npm prefix as a background command whose own timeout is at least as long, and
+act on its single completion. Do not poll `status`, loop on `grep` or use a Monitor to
+detect completion. Exit 3 means the bound passed with the job still active; inspect it
+with `queue -- inspect <job-uuid>` instead of waiting again. Use
 `queue -- cancel <job-uuid>` to stop one. Waiting/completed queue states are not feature proof.
 
 Replace the example charter with the feature's actions and exact expected hooks.
