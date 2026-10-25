@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Code PreToolUse guard for PR evidence and push targets."""
+"""Claude Code PreToolUse guard for PR evidence, push targets, merge checks and the shared browser-test queue."""
 import json
 import os
 import re
@@ -9,6 +9,16 @@ import sys
 from pathlib import Path
 
 PLACEHOLDER = re.compile(r"<[a-z][^<>\n]*>")
+QUEUE = 'npm --prefix "$(python3 ~/.agents/skill-config/scripts/skills.py toolkit-root)" run queue -- run -- '
+SCRIPT_RUNNERS = {"bun", "bunx", "npm", "npx", "pnpm", "yarn", "turbo"}
+SHELLS = {"sh", "bash", "zsh", "dash"}
+PLAYWRIGHT = re.compile(r"(?:^|/)@?playwright(?:/test)?(?:/cli\.js)?$")
+HEREDOC = re.compile(r"(<<-?\s*(['\"]?)([A-Za-z_]\w*)\2)([^\n]*)\n.*?^\s*\3\s*$", re.S | re.M)
+REDIRECT = re.compile(r"^\d*(?:>>?|<)")
+GREEN = {"pass", "skipping"}
+CHECKS_TIMEOUT = 20
+MERGE_VALUE_OPTIONS = {"-A", "--author-email", "-b", "--body", "-F", "--body-file", "--match-head-commit",
+                       "-R", "--repo", "-t", "--subject"}
 
 
 def remote(path):
@@ -62,12 +72,74 @@ def evidence_errors(body):
     return errors
 
 
+def browser_test(words):
+    """The browser-test command of a segment that runs Playwright or a test:e2e script outside the toolkit queue."""
+    if "--list" in words:
+        return None
+    for index, word in enumerate(words):
+        name = os.path.basename(word)
+        if name in ("queue", "verify:app", "testq", "testq.mjs"):
+            return None
+        if name in SHELLS and "-c" in words[index:-1]:
+            inner = words[words.index("-c", index) + 1]
+            return next(filter(None, map(browser_test, segments(inner))), None)
+        playwright = PLAYWRIGHT.search(word) and words[index + 1:index + 2] == ["test"]
+        script = re.search(r"(?:^|#)test:e2e", word) and SCRIPT_RUNNERS & {os.path.basename(w) for w in words[:index]}
+        if playwright or script:
+            end = next((i for i, w in enumerate(words) if REDIRECT.match(w)), len(words))
+            return shlex.join(words[:end])
+    return None
+
+
+def merge_target(words):
+    rest = iter(words[3:])
+    for word in rest:
+        if word in MERGE_VALUE_OPTIONS:
+            next(rest, None)
+        elif not word.startswith("-"):
+            return word
+    return None
+
+
+def unfinished_checks(words, here):
+    """Every check must finish green before a merge; any other state, or one gh cannot report, needs the user."""
+    command = ["gh", "pr", "checks", *filter(None, [merge_target(words)]), "--json", "name,bucket"]
+    repo = option(words, "--repo", "-R")
+    if repo:
+        command += ["--repo", repo]
+    shown = shlex.join(command)
+    try:
+        result = subprocess.run(command, cwd=here, capture_output=True, text=True, timeout=CHECKS_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return f"`{shown}` timed out after {CHECKS_TIMEOUT} s, so the check state is unknown"
+    except OSError as error:
+        return f"`{shown}` could not run ({error.strerror}), so the check state is unknown"
+    try:
+        checks = json.loads(result.stdout)
+    except ValueError:
+        reason = next(iter(result.stderr.strip().splitlines()), f"exit {result.returncode}")
+        return f"`{shown}` failed ({reason}), so the check state is unknown"
+    if not checks:
+        return "this PR reports no checks"
+    unfinished = {}
+    for check in checks:
+        if check.get("bucket") not in GREEN:
+            unfinished.setdefault(check.get("bucket") or "unknown", []).append(check.get("name") or "unnamed")
+    labels = {"fail": "failed", "cancel": "cancelled"}
+    return "; ".join(f"{labels.get(bucket, bucket)}: {', '.join(names)}" for bucket, names in unfinished.items()) or None
+
+
 def decide(payload):
     if payload.get("tool_name") != "Bash":
         return None
     command = payload.get("tool_input", {}).get("command", "")
     cwd = Path(payload.get("cwd") or os.getcwd())
     project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or cwd)
+    for words in segments(HEREDOC.sub(r"\1\4", command)):
+        test = browser_test(words)
+        if test:
+            return ("deny", "Browser tests share one queue so this Mac runs one at a time; an unqueued run overloaded "
+                            f"it before. Run it through the queue instead: {QUEUE}{test}")
     here = cwd
     for words in segments(command):
         if not words:
@@ -86,6 +158,11 @@ def decide(payload):
             if repo and home and repo != home:
                 return ("ask", f"This session's repo is {home}, but this command targets {repo}. "
                                "Confirm the user named this repo as the target.")
+        if words[:3] == ["gh", "pr", "merge"] and "--disable-auto" not in words:
+            unfinished = unfinished_checks(words, here)
+            if unfinished:
+                return ("ask", f"Not every PR check has finished green ({unfinished}). Wait until all checks pass, "
+                               "or confirm the user approved merging in this state.")
         if is_pr:
             body = option(words, "--body")
             body_file = option(words, "--body-file", "-F")
