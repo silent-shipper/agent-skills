@@ -105,7 +105,8 @@ class AgentGuardTests(unittest.TestCase):
         self.assertTrue(guard.QUEUE.startswith('npm --prefix "$(python3 ~/.agents/skill-config/scripts/skills.py toolkit-root)" run queue -- run -- '))
         for command in ("bunx playwright test e2e/swap.spec.ts", "./node_modules/.bin/playwright test",
                         "node node_modules/@playwright/test/cli.js test", "CI=1 pnpm test:e2e",
-                        "turbo run test:e2e --filter=defuse-near", "bash -c 'cd apps/defuse-near && bun run test:e2e:local'",
+                        "turbo run test:e2e --filter=defuse-near", "CI=1 timeout 900 pnpm exec playwright test",
+                        "env PWDEBUG=0 bunx --bun playwright test e2e", "pnpm --filter defuse-near test:e2e:local", "bash -c 'cd apps/defuse-near && bun run test:e2e:local'",
                         "git status; npx playwright test --project=chromium | tee run.log"):
             self.assertEqual(self.decide(command, self.app)[0], "deny", command)
 
@@ -115,7 +116,8 @@ class AgentGuardTests(unittest.TestCase):
                         'npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- run -- bunx playwright test e2e/swap.spec.ts',
                         'npm --prefix "$VERIFY_TOOLKIT_ROOT" run verify:app -- --feature swap.basic',
                         "bunx playwright test --list", "bunx playwright show-report",
-                        'git commit -m "test:e2e: fix flake"',
+                        'git commit -m "test:e2e: fix flake"', "grep -rn playwright test", "rg -l playwright test e2e",
+                        "timeout 900 npm --prefix \"$VERIFY_TOOLKIT_ROOT\" run queue -- run -- npx playwright test",
                         "cat > /tmp/body.md <<'EOF'\n- bun run test:e2e:local accountPasskeys\nEOF\ngit status"):
             self.assertIsNone(self.decide(command, self.app), command)
 

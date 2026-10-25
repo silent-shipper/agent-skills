@@ -12,6 +12,7 @@ PLACEHOLDER = re.compile(r"<[a-z][^<>\n]*>")
 QUEUE = 'npm --prefix "$(python3 ~/.agents/skill-config/scripts/skills.py toolkit-root)" run queue -- run -- '
 SCRIPT_RUNNERS = {"bun", "bunx", "npm", "npx", "pnpm", "yarn", "turbo"}
 SHELLS = {"sh", "bash", "zsh", "dash"}
+LAUNCHERS = SCRIPT_RUNNERS | {"node", "env", "exec", "x", "timeout", "nohup", "time", "caffeinate", "--"}
 PLAYWRIGHT = re.compile(r"(?:^|/)@?playwright(?:/test)?(?:/cli\.js)?$")
 HEREDOC = re.compile(r"(<<-?\s*(['\"]?)([A-Za-z_]\w*)\2)([^\n]*)\n.*?^\s*\3\s*$", re.S | re.M)
 REDIRECT = re.compile(r"^\d*(?:>>?|<)")
@@ -83,7 +84,8 @@ def browser_test(words):
         if name in SHELLS and "-c" in words[index:-1]:
             inner = words[words.index("-c", index) + 1]
             return next(filter(None, map(browser_test, segments(inner))), None)
-        playwright = PLAYWRIGHT.search(word) and words[index + 1:index + 2] == ["test"]
+        launched = all(os.path.basename(w) in LAUNCHERS or w.startswith("-") or re.match(r"^\w+=|^\d+$", w) for w in words[:index])
+        playwright = PLAYWRIGHT.search(word) and words[index + 1:index + 2] == ["test"] and launched
         script = re.search(r"(?:^|#)test:e2e", word) and SCRIPT_RUNNERS & {os.path.basename(w) for w in words[:index]}
         if playwright or script:
             end = next((i for i, w in enumerate(words) if REDIRECT.match(w)), len(words))
