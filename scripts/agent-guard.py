@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Code PreToolUse guard for PR evidence, push targets, merge checks and the shared browser-test queue."""
+"""Claude Code PreToolUse guard for PR evidence, push targets, merge checks and the shared test queue."""
 import json
 import os
 import re
@@ -9,7 +9,18 @@ import sys
 from pathlib import Path
 
 PLACEHOLDER = re.compile(r"<[a-z][^<>\n]*>")
-QUEUE = 'npm --prefix "$(python3 ~/.agents/skill-config/scripts/skills.py toolkit-root)" run queue -- run -- '
+TOOLKIT = '"$(python3 ~/.agents/skill-config/scripts/skills.py toolkit-root)"'
+QUEUE = f"npm --prefix {TOOLKIT} run queue -- run -- "
+WORK_QUEUE = f"npm --prefix {TOOLKIT} run queue -- run --lane work -- "
+MONOREPO = "defuse-protocol/defuse-frontend-monorepos"
+HEAVY_SCRIPTS = {"test", "build", "typecheck"}
+TEST_TOOLS = {"vitest", "jest"}
+TEST_FILE = re.compile(r"\.(?:test|spec)\.[cm]?[jt]sx?$")
+RECEIPT = re.compile(r"<!--\s*verification-job:\s*([a-f0-9-]{36})\s*-->")
+NOT_CLAIMED = re.compile(r"^\s*[-*]\s+(?:not verified in browser|n/a)\b", re.I | re.M)
+IMAGE = re.compile(r"!\[[^\]]*\]\([^)\s]+\)|<img\s[^>]*src=")
+CAPTURE_FAILED = re.compile(r"^\s*[-*]?\s*capture failed:", re.I | re.M)
+QUEUE_TIMEOUT = 60
 SCRIPT_RUNNERS = {"bun", "bunx", "npm", "npx", "pnpm", "yarn", "turbo"}
 SHELLS = {"sh", "bash", "zsh", "dash"}
 LAUNCHERS = SCRIPT_RUNNERS | {"node", "env", "exec", "x", "timeout", "nohup", "time", "caffeinate", "--"}
@@ -70,7 +81,87 @@ def evidence_errors(body):
         part = re.search(rf"(?ms)^## {heading}\s*$(.*?)(?=^## |\Z)", body)
         if part and PLACEHOLDER.search(part[1]):
             errors.append("unfilled template placeholder " + PLACEHOLDER.search(part[1])[0])
+    screenshots = re.search(r"(?ms)^## Screenshots\s*$(.*?)(?=^## |\Z)", body)
+    if screenshots and not IMAGE.search(screenshots[1]) and not CAPTURE_FAILED.search(screenshots[1]):
+        errors.append("`## Screenshots` has no image; attach the capture or write `Capture failed: <reason>`")
+    if claimed(section[1]) and not RECEIPT.search(body):
+        errors.append("browser bullets need the passing run's hidden receipt `<!-- verification-job: <job-uuid> -->`; "
+                      "otherwise write `- Not verified in browser: <reason>`")
     return errors
+
+
+def claimed(section):
+    """Whether the browser section claims proof rather than stating it was not checked."""
+    bullets = re.findall(r"(?m)^\s*[-*]\s+\S.*$", section)
+    return any(not NOT_CLAIMED.match(bullet) for bullet in bullets)
+
+
+def queue_json(args, cwd):
+    command = f"npm --prefix {TOOLKIT} run -s queue -- {shlex.join(args)}"
+    result = subprocess.run(["sh", "-c", command], cwd=cwd, capture_output=True, text=True, timeout=QUEUE_TIMEOUT)
+    try:
+        return json.loads(result.stdout)
+    except ValueError:
+        raise RuntimeError(next(iter(result.stderr.strip().splitlines()), f"exit {result.returncode}")) from None
+
+
+def receipt_problems(body, here):
+    """Each receipt must name a verification that passed and still matches its app checkout's current source."""
+    problems = []
+    for job in dict.fromkeys(RECEIPT.findall(body)):
+        try:
+            app = queue_json(["inspect", job], here).get("cwd")
+            report = queue_json(["accept", job, "--app", app or "."], here)
+        except (OSError, subprocess.SubprocessError, RuntimeError) as error:
+            problems.append(f"{job}: could not be checked ({error})")
+            continue
+        if report.get("status") != "passed":
+            code = report.get("acceptance", {}).get("code") or report.get("code") or "not accepted"
+            problems.append(f"{job}: {report.get('status', 'unknown')} ({code})")
+    return problems
+
+
+def heavy_check(words):
+    """A full unit suite, build or typecheck that runs outside the toolkit queue; focused test files stay direct."""
+    words = words[:next((i for i, w in enumerate(words) if REDIRECT.match(w)), len(words))]
+    if "--list" in words or {"--help", "--version", "-v"} & set(words):
+        return None
+    for index, word in enumerate(words):
+        if os.path.basename(word) in ("queue", "verify:app", "testq", "testq.mjs"):
+            return None
+        if os.path.basename(word) in SHELLS and "-c" in words[index:-1]:
+            inner = words[words.index("-c", index) + 1]
+            return next(filter(None, map(heavy_check, segments(inner))), None)
+    start = 0
+    while start < len(words) and (re.match(r"^\w+=", words[start]) or os.path.basename(words[start]) in {"env", "exec", "nohup", "time"}):
+        start += 1
+    rest = words[start:]
+    if not rest:
+        return None
+    tool, args = os.path.basename(rest[0]), rest[1:]
+    if tool in {"npx", "bunx"} or rest[:2] == ["pnpm", "exec"]:
+        args = args[1:] if tool == "pnpm" else args
+        while args and args[0].startswith("-"):
+            args = args[1:]
+        if not args:
+            return None
+        tool, args = os.path.basename(args[0]), args[1:]
+    focused = any("/" in w or TEST_FILE.search(w) for w in args if not w.startswith("-"))
+    if tool in SCRIPT_RUNNERS:
+        positional = [w for w in args if not w.startswith("-")]
+        script = positional[1] if positional[:1] == ["run"] and len(positional) > 1 else (positional or [""])[0]
+        if script not in HEAVY_SCRIPTS:
+            return None
+        heavy = script != "test" or not focused
+    elif tool in TEST_TOOLS:
+        heavy = not focused
+    elif tool == "tsc":
+        heavy = True
+    elif tool == "next":
+        heavy = args[:1] == ["build"]
+    else:
+        return None
+    return (words[:start], words[start:]) if heavy else None
 
 
 def browser_test(words):
@@ -143,6 +234,18 @@ def decide(payload):
             return ("deny", "Browser tests share one queue so this Mac runs one at a time; an unqueued run overloaded "
                             f"it before. Run it through the queue instead: {QUEUE}{test}")
     here = cwd
+    for words in segments(HEREDOC.sub(r"\1\4", command)):
+        if words[:1] == ["cd"] and len(words) > 1:
+            here = (here / os.path.expanduser(words[1])).resolve()
+            continue
+        heavy = heavy_check(words)
+        if heavy and remote(here) == MONOREPO:
+            assignments, run = heavy
+            prefix = shlex.join(assignments) + " " if assignments else ""
+            return ("deny", "Full unit suites, builds and typechecks run in the queue's work lane (two at a time) so they "
+                            "cannot overload this Mac beside a browser run; a direct full suite did on 2026-10-26. Name the "
+                            f"affected test files to run them directly, or queue it: {prefix}{WORK_QUEUE}{shlex.join(run)}")
+    here = cwd
     for words in segments(command):
         if not words:
             continue
@@ -178,6 +281,11 @@ def decide(payload):
                 if errors:
                     return ("deny", "PR body fails the ship evidence gate: " + "; ".join(errors)
                             + ". Fill Screenshots and Verified in browser per the ship skill before opening or updating the PR.")
+                problems = receipt_problems(body, here)
+                if problems:
+                    return ("ask", "The PR claims browser proof, but its verification receipt does not show a pass on the "
+                                   "current source: " + "; ".join(problems) + ". Rerun or re-accept the verification, or "
+                                   "confirm the user approved shipping with this evidence.")
     return None
 
 

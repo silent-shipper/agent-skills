@@ -74,9 +74,10 @@ git -C /tmp/pr-assets push origin pr-assets && git worktree remove /tmp/pr-asset
 
 Reference each image as
 `![<caption>](https://github.com/<owner>/<repo>/blob/pr-assets/<branch>/<file>.png?raw=true)`
-so it renders for anyone who can read the repository. If publishing is
-impossible, say so in one line under `## Screenshots` instead of dropping the
-section.
+so it renders for anyone who can read the repository. If capturing or
+publishing is impossible, write one line `Capture failed: <reason>` under
+`## Screenshots` instead of dropping the section; the hook denies a Screenshots
+section with neither an image nor that line.
 
 ### Verified in browser
 
@@ -88,6 +89,13 @@ instead: `- Not verified in browser: <reason>` or `- n/a: no UI or user flow
 changed`. The `agent-guard` hook denies `gh pr create`/`gh pr edit` bodies
 without a `## Verified in browser` section containing a bullet, or with
 unfilled placeholders.
+
+Browser bullets need a receipt: add one hidden line
+`<!-- verification-job: <job-uuid> -->` per managed verification that proves
+them. Reviewers do not see it. The hook denies browser bullets without a
+receipt and runs `queue -- accept` on each one. It asks the user unless every
+receipt passed and still matches its checkout's current source, so rerun or
+re-accept after any later edit.
 
 Example:
 

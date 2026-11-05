@@ -160,8 +160,21 @@ Next starts after queue admission and closes afterward. Fix compilation failures
 before retrying. A verification runs its preflight (charter, identity route, app environment,
 dependencies, dev server, disk, cleanup gate) before it is queued; a blocked preflight
 names a remedy. Fix the prerequisite and rerun; never skip browser proof because a
-checkout lacks setup. Check first with `queue -- doctor --app . --charter <file>`. `--url "$VERIFY_APP_URL"` before the
-`--` reuses a caller-owned server; another checkout or production cannot prove local edits.
+checkout lacks setup. `--url "$VERIFY_APP_URL"` before the `--` reuses a
+caller-owned server; another checkout or production cannot prove local edits.
+
+Before the first doctor or run in each target checkout, including a separate
+baseline, prepare that checkout with the selected toolkit:
+
+```bash
+npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- prepare-app --app .
+npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- doctor --app . --charter /absolute/path/to/charter.json
+```
+
+`prepare-app` owns missing app environment files, checkout dependencies and the
+excluded identity route. Follow its reported remedy for anything still missing.
+Preserve any explicit verifier configuration when running doctor and verification,
+and retain the configured funded account.
 
 ```bash
 npm --prefix "$VERIFY_TOOLKIT_ROOT" run verify:app -- -- --charter /tmp/feature-charter.json

@@ -23,9 +23,17 @@ Fix.
 ## Verified in browser
 
 - Swap settles on the preview.
+<!-- verification-job: 7d9d27f1-a61f-430a-9ad3-f7190c6ada68 -->
 
 ## Merge Danger
 """
+JOB = "7d9d27f1-a61f-430a-9ad3-f7190c6ada68"
+
+# The direct full suite and typecheck that overlapped a queued browser run before the 2026-10-26 overload and restart.
+FULL_SUITE = "HEADLESS=true bun run test --run > /tmp/nightly-921-unit.log 2>&1"
+FULL_TYPECHECK = "NODE_OPTIONS=--max-old-space-size=4096 bun run typecheck 2>&1 | tail -8"
+FOCUSED_RERUN = ("HEADLESS=true bun run test --run --maxWorkers=2 --minWorkers=1 src/features/tradingSigner/index.test.ts "
+                 "src/shared/utils/compareNullableNumber.test.ts 2>&1 | head -20")
 
 # The unqueued run that preceded the Mac mini running out of memory and rebooting.
 CRASH_RUN = "bun run test:e2e:local accountPasskeys --reporter=line > /tmp/pr804-runs/baseline-7dc603bee.log"
@@ -54,6 +62,7 @@ class AgentGuardTests(unittest.TestCase):
         self.root = Path(directory.name)
         self.e2e = self.repo("e2e", "git@github.com:silent-shipper/metamask-e2e.git")
         self.app = self.repo("app", "https://github.com/defuse-protocol/defuse-frontend-monorepos.git")
+        (self.app / "apps/defuse-near").mkdir(parents=True)
 
     def repo(self, name, url):
         path = self.root / name
@@ -91,11 +100,72 @@ class AgentGuardTests(unittest.TestCase):
         body = PROVEN.replace("- Swap settles on the preview.\n", "")
         self.assertIn("no bullet", self.decide("gh pr create --body " + shlex.quote(body), self.app)[1])
 
+    def receipts(self, command, accepted):
+        calls = []
+
+        def queue(args, cwd):
+            calls.append(args)
+            return {"cwd": str(self.app / "apps/defuse-near")} if args[0] == "inspect" else accepted
+
+        with patch.object(guard, "queue_json", queue):
+            return self.decide(command, self.app), calls
+
     def test_proven_pr_is_allowed(self):
         body = self.root / "body.md"
         body.write_text(PROVEN)
-        self.assertIsNone(self.decide(f"gh pr create --body-file {body}", self.app))
+        result, calls = self.receipts(f"gh pr create --body-file {body}", {"status": "passed", "code": "VERIFIED"})
+        self.assertIsNone(result)
+        self.assertEqual(calls, [["inspect", JOB], ["accept", JOB, "--app", str(self.app / "apps/defuse-near")]])
         self.assertIsNone(self.decide("gh pr edit 5 --add-label bug", self.app))
+
+    def test_browser_claim_without_receipt_is_denied(self):
+        body = PROVEN.replace(f"<!-- verification-job: {JOB} -->\n", "")
+        result = self.decide("gh pr create --body " + shlex.quote(body), self.app)
+        self.assertEqual(result[0], "deny")
+        self.assertIn("verification-job", result[1])
+
+    def test_stale_or_failed_receipt_asks(self):
+        stale = {"status": "blocked", "code": "SOURCE_VERIFICATION_MISMATCH",
+                 "acceptance": {"status": "blocked", "code": "SOURCE_VERIFICATION_MISMATCH"}}
+        result, _ = self.receipts("gh pr edit 5 --body " + shlex.quote(PROVEN), stale)
+        self.assertEqual(result[0], "ask")
+        self.assertIn(f"{JOB}: blocked (SOURCE_VERIFICATION_MISMATCH)", result[1])
+        result, _ = self.receipts("gh pr edit 5 --body " + shlex.quote(PROVEN), {"status": "failed", "code": "ASSERTION_FAILED"})
+        self.assertIn("failed (ASSERTION_FAILED)", result[1])
+
+    def test_truthful_unverified_pr_needs_no_receipt(self):
+        body = PROVEN.replace("- Swap settles on the preview.", "- Not verified in browser: 1Click auth is down.")
+        body = body.replace(f"<!-- verification-job: {JOB} -->\n", "")
+        self.assertIsNone(self.decide("gh pr create --body " + shlex.quote(body), self.app))
+        no_ui = body.replace("- Not verified in browser: 1Click auth is down.", "- n/a: no UI or user flow changed")
+        self.assertIsNone(self.decide("gh pr create --body " + shlex.quote(no_ui), self.app))
+
+    def test_screenshots_need_an_image_or_capture_failure(self):
+        body = PROVEN.replace("![Swap settled](https://github.com/org/repo/blob/pr-assets/fix/after.png?raw=true)",
+                              "Screenshots attached in the thread.")
+        result, _ = self.receipts("gh pr create --body " + shlex.quote(body), {"status": "passed"})
+        self.assertEqual(result[0], "deny")
+        self.assertIn("no image", result[1])
+        failed = body.replace("Screenshots attached in the thread.", "Capture failed: the dev server would not start.")
+        self.assertIsNone(self.receipts("gh pr create --body " + shlex.quote(failed), {"status": "passed"})[0])
+
+    def test_unqueued_full_suites_in_the_monorepo_are_denied(self):
+        result = self.decide(f"cd {self.app}/apps/defuse-near && {FULL_SUITE}", self.app)
+        self.assertEqual(result[0], "deny")
+        self.assertIn("HEADLESS=true " + guard.WORK_QUEUE + "bun run test --run", result[1])
+        result = self.decide(FULL_TYPECHECK, self.app)
+        self.assertIn("NODE_OPTIONS=--max-old-space-size=4096 " + guard.WORK_QUEUE + "bun run typecheck", result[1])
+        for command in ("bun run build", "npx tsc --noEmit", "bunx --bun vitest run", "turbo test", "turbo run typecheck",
+                        "pnpm exec next build", "bun test", "npm test", "bash -c 'cd apps/defuse-near && bun run test --run'"):
+            self.assertEqual((self.decide(command, self.app) or ("allow",))[0], "deny", command)
+
+    def test_focused_queued_and_other_repo_checks_are_allowed(self):
+        for command in (FOCUSED_RERUN, "bunx vitest run src/features/swap/machine.test.ts", "bun run lint", "bun install",
+                        "bunx tsc --version", "bun run test:e2e:local --list", "git log --grep 'bun run build'",
+                        guard.WORK_QUEUE + "bun run test --run",
+                        "cat > /tmp/notes.md <<'EOF'\nbun run test --run\nEOF\ngit status"):
+            self.assertIsNone(self.decide(command, self.app), command)
+        self.assertIsNone(self.decide(FULL_SUITE, self.e2e))
 
 
     def test_unqueued_browser_tests_are_denied(self):

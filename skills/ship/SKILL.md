@@ -14,7 +14,8 @@ Confirm the checkout, branch, intended diff and requested endpoint from the
 session. Ship only to the repository the user named; "ship to main" is scoped to
 that repository. Changing another repository needs the user's confirmation; the
 installed `agent-guard` hook asks before a push, PR create, edit or merge that
-targets a repository other than the session's. A request to resolve, ship or
+targets a repository other than the session's, and checks PR-body browser
+receipts as described in [opening-a-pr.md](opening-a-pr.md). A request to resolve, ship or
 merge a stack covers every PR in that stack, root first, not only the current one. Existing explicit authorization persists: "ship it", "push this" and
 "commit and push" authorize the corresponding actions for this scope. Continue
 without a second push-confirmation question. A local-only or draft-only request
