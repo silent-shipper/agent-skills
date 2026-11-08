@@ -64,7 +64,11 @@ cause and what remains unproven. Tester Army logs in through MetaMask itself; ne
 substitute Playwright, a preview route or screenshots because login looks hard.
 Claim completion only by citing the run's `result.json` status and code for the
 current source; an edit or merge after the run makes it stale until rerun or
-accepted. Never dismiss a failed run or tester finding as a glitch without evidence
+accepted. Before calling a change browser-verified, run
+`npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- coverage --base <base-ref> --app <apps/defuse-near>`
+and report every changed control it lists as exercised, waived with a stated reason
+(`--waive <testId>=<reason>`), or not exercised. A VERIFIED run whose outcomes never
+touch the changed control does not prove the change; extend the charter instead. Never dismiss a failed run or tester finding as a glitch without evidence
 from its proof. `STEPS_RECOVERED` means every declared outcome passed after an
 earlier step failed: read those steps in `tester/report.json` and decide case by case.
 Report a product symptom (a stuck control, a wrong or empty list) as a finding; if it
@@ -147,7 +151,7 @@ Pass `--charter /absolute/path/to/charter.json`; a free-form goal alone cannot p
 Before any run, lint it: `node "$VERIFY_TOOLKIT_ROOT/src/verification/charter-lint.mjs" --app . --charter <file>`
 must pass. Fix every problem it reports. Bind dynamic row IDs with resource templates, never
 wildcards. Take expected values from `test/CONTRACT.md` or a bound resource, never guess them.
-Keep a charter to ten outcomes or fewer and split longer journeys into separate charters.
+Keep a charter to ten outcomes or fewer, not counting preconditions, and split longer journeys into separate charters.
 Authenticated goals ask the tester to log in; it calls `login_with_metamask`,
 then records the session outcome before feature checks. Describe login steps only when the
 login controls are the feature under test.
@@ -162,6 +166,10 @@ dependencies, dev server, disk, cleanup gate) before it is queued; a blocked pre
 names a remedy. Fix the prerequisite and rerun; never skip browser proof because a
 checkout lacks setup. `--url "$VERIFY_APP_URL"` before the `--` reuses a
 caller-owned server; another checkout or production cannot prove local edits.
+To check a deployment (QA, preview or production), add `--remote` with its https `--url`
+(a Vercel `_vercel_share` link, or `VERCEL_AUTOMATION_BYPASS_SECRET` in the environment,
+reaches protected previews). A remote run binds no source and refuses any outcome or
+wallet request that can move funds; `accept` never counts it as proof of local source.
 
 Before the first doctor or run in each target checkout, including a separate
 baseline, prepare that checkout with the selected toolkit:
@@ -172,7 +180,9 @@ npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- doctor --app . --charter /absol
 ```
 
 `prepare-app` owns missing app environment files, checkout dependencies and the
-excluded identity route. Follow its reported remedy for anything still missing.
+excluded identity route; `verify:app` also runs it at admission when those are the only
+blockers. Follow its reported remedy for anything still missing. Doctor ends with its
+overall `status`, `code` and `remedy`; read that last line, not a nested check.
 Preserve any explicit verifier configuration when running doctor and verification,
 and retain the configured funded account.
 
@@ -190,14 +200,22 @@ For a refactor or any change that touches several features or commits, write one
 command to resume: finished cells are reused only while their app source, charter and toolkit are
 unchanged. A held batch names its remedy (repeated infrastructure blocks, or a funded attempt to
 reconcile before `--reconciled`). `queue -- batch status <spec.json>` prints the evidence matrix.
+When asked to reproduce a reported bug before fixing it, add `"reproduce": {"base": <cell>, "head": <cell>}`
+with the same charter on a checkout before and after the fix; the matrix reports
+`REPRODUCED_AND_FIXED`, `REPRODUCED_NOT_FIXED`, `NOT_REPRODUCED` or `REPRODUCTION_INCONCLUSIVE`.
 
 Keep the historical run verdict separate from current acceptance. A source or
 charter change blocks reuse; do not claim an earlier pass proves the edited patch.
 A mapped charter can be rechecked with `accept <job-id> --feature <feature-id>`.
 
 All browser checks and large unit suites use this shared queue across Codex and
-Claude; keep coding in parallel. Do not start verification servers before queue
-admission. Use `npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- run -- <command>`
+Claude. A queued or running verification stops as soon as its app source changes
+(test, spec and Markdown edits excepted), so keep editing in another worktree, or
+submit after your last runtime edit. Do not start verification servers before queue
+admission. Funded jobs wait in line for the shared account lease after their
+preflight passes; `queue -- lease status` shows the holder and the line. When the user
+asks for a job to go first, use `queue -- promote <job-uuid>`; never resubmit or rename
+a charter to reorder. Use `npm --prefix "$VERIFY_TOOLKIT_ROOT" run queue -- run -- <command>`
 for other heavy checks; typecheck, unit test, lint and build commands use a separate work
 lane and do not wait behind browser runs. To wait for a queued job, run one
 `queue -- wait <job-uuid> --timeout-ms 7200000` (or `--app <apps/defuse-near>`) through
@@ -307,6 +325,11 @@ a finished journey; financial proof also needs reconciled receipts/balance
 evidence. AI prose or exit zero alone is insufficient. Missing/skipped/timed-out
 or incomplete proof is blocked. Inspect existing runners' reports equally.
 
+`verify:app`, `wait` and `inspect` end stderr with one `[testq] RESULT <status> <code> job=… evidence=…`
+line plus missing/failed outcomes and a `next:` remedy; read that instead of parsing JSON.
+Find earlier runs with `queue -- history --feature <id>` (never by newest directory). Each
+passed UI outcome leaves a screenshot under `captures/auto/` in the run's evidence, listed
+in `inspect`'s `verification.links.captures`; use them when the user asks for screenshots.
 For Tester Army, use the app verifier's accepted status for completion and `queue -- inspect
 <job-uuid>` for the historical canonical headline, required
 outcome coverage, source identity, resource links and failed/blocked gaps. Source
