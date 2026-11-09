@@ -87,8 +87,8 @@ List only what was checked in a real browser, one short bullet per behavior, in
 words a reviewer understands without the code. Lead with the outcome. Leave
 out tests, lint, typecheck, build, CI, job IDs, tool or agent names and how the
 proof was collected. When nothing was checked in a browser, write one bullet
-instead: `- Not verified in browser: <reason>` or `- n/a: no UI or user flow
-changed`. The `agent-guard` hook denies `gh pr create`/`gh pr edit` bodies
+instead: `- Not verified in browser: <reason>` (or `- Not browser-verified:
+<reason>`) or `- n/a: no UI or user flow changed`. The `agent-guard` hook denies `gh pr create`/`gh pr edit` bodies
 without a `## Verified in browser` section containing a bullet, or with
 unfilled placeholders.
 
@@ -98,6 +98,15 @@ them. Reviewers do not see it. The hook denies browser bullets without a
 receipt and runs `queue -- accept` on each one. It asks the user unless every
 receipt passed and still matches its checkout's current source, so rerun or
 re-accept after any later edit.
+
+Browser bullets also need a coverage receipt for the PR head. On the commit you
+push, run `npm --prefix "$(python3 ~/.agents/skill-config/scripts/skills.py toolkit-root)" run queue -- coverage --base origin/<base>`
+from the app directory; it writes the receipt under the checkout's git
+directory. The hook denies the body unless that head's receipt compares with the
+PR's base and lists no changed control or feature that no passing run
+exercised. Extend the charter to exercise each one, or rerun with
+`--waive <id>=<reason>` and name the gap under Merge Danger. A later commit
+needs a new receipt.
 
 Example:
 

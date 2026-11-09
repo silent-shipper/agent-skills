@@ -63,6 +63,7 @@ class AgentGuardTests(unittest.TestCase):
         self.e2e = self.repo("e2e", "git@github.com:silent-shipper/metamask-e2e.git")
         self.app = self.repo("app", "https://github.com/defuse-protocol/defuse-frontend-monorepos.git")
         (self.app / "apps/defuse-near").mkdir(parents=True)
+        self.base = self.head = None
 
     def repo(self, name, url):
         path = self.root / name
@@ -100,14 +101,41 @@ class AgentGuardTests(unittest.TestCase):
         body = PROVEN.replace("- Swap settles on the preview.\n", "")
         self.assertIn("no bullet", self.decide("gh pr create --body " + shlex.quote(body), self.app)[1])
 
+    def commit(self, message):
+        subprocess.run(["git", "-C", str(self.app), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
+                        "commit", "-q", "--allow-empty", "-m", message], check=True)
+        return subprocess.run(["git", "-C", str(self.app), "rev-parse", "HEAD"], capture_output=True, text=True,
+                              check=True).stdout.strip()
+
+    def coverage(self, not_exercised=(), base=None, features=()):
+        """A PR branch one commit past origin/main, with the receipt `coverage --base origin/main` writes for its head."""
+        if not self.base:
+            self.base = self.commit("base")
+            subprocess.run(["git", "-C", str(self.app), "update-ref", "refs/remotes/origin/main", self.base], check=True)
+            self.head = self.commit("feature")
+        receipt = self.app / ".git/near-verify/coverage" / self.head / "0123456789abcdef.json"
+        receipt.parent.mkdir(parents=True, exist_ok=True)
+        app = str(self.app / "apps/defuse-near")
+        receipt.write_text(json.dumps({"head": self.head, "app": app, "base": base or self.base,
+                                       "status": "not-exercised" if not_exercised or features else "exercised",
+                                       "files": [{"path": "src/swap.tsx", "exercised": [{"testId": "swap-submit", "jobs": [JOB]}],
+                                                  "notExercised": list(not_exercised), "waived": []}],
+                                       "features": {"changed": [], "withoutPassingRun": list(features), "waived": []}}))
+        return receipt
+
     def receipts(self, command, accepted):
+        if not self.base:
+            self.coverage()
         calls = []
 
         def queue(args, cwd):
             calls.append(args)
             return {"cwd": str(self.app / "apps/defuse-near")} if args[0] == "inspect" else accepted
 
-        with patch.object(guard, "queue_json", queue):
+        self.fake_gh()
+        env = {"PATH": f"{self.root / 'bin'}:{os.environ['PATH']}", "FAKE_GH_LOG": str(self.root / "gh.log"),
+               "FAKE_GH_MODE": "", "FAKE_GH_CHECKS": json.dumps({"headRefOid": self.head, "baseRefName": "main"})}
+        with patch.object(guard, "queue_json", queue), patch.dict(os.environ, env):
             return self.decide(command, self.app), calls
 
     def test_proven_pr_is_allowed(self):
@@ -124,6 +152,37 @@ class AgentGuardTests(unittest.TestCase):
         self.assertEqual(result[0], "deny")
         self.assertIn("verification-job", result[1])
 
+    def test_browser_claim_with_an_unexercised_changed_control_is_denied(self):
+        # Each of the escaped defects shipped behind a VERIFIED run whose outcomes never read the changed control.
+        self.coverage(not_exercised=["swap-flip"], features=["swap.slippage"])
+        result, calls = self.receipts("gh pr create --body " + shlex.quote(PROVEN), {"status": "passed"})
+        self.assertEqual(result[0], "deny")
+        self.assertIn("exercise or `--waive ID=REASON` these changed controls: swap-flip, swap.slippage", result[1])
+        self.assertEqual(calls, [], "the gate denies before spending a queue call on the receipt")
+
+    def test_browser_claim_without_a_coverage_receipt_for_the_head_is_denied(self):
+        self.coverage()
+        self.head = self.commit("later fix")
+        result, _ = self.receipts("gh pr create --body " + shlex.quote(PROVEN), {"status": "passed"})
+        self.assertEqual(result[0], "deny")
+        self.assertIn(f"no coverage receipt for head {self.head[:12]}", result[1])
+        self.assertIn("run queue -- coverage --base origin/main", result[1])
+
+    def test_coverage_against_a_later_base_is_denied(self):
+        # `--base HEAD` lists no changed controls, so it cannot stand in for the PR's own base.
+        self.coverage()
+        self.coverage(base=self.head)
+        result, _ = self.receipts("gh pr create --body " + shlex.quote(PROVEN), {"status": "passed"})
+        self.assertEqual(result[0], "deny")
+        self.assertIn("not the PR's base origin/main", result[1])
+
+    def test_pr_edit_checks_the_receipt_for_the_pr_head(self):
+        self.coverage(not_exercised=["swap-flip"])
+        result, _ = self.receipts("gh pr edit 5 --body " + shlex.quote(PROVEN), {"status": "passed"})
+        self.assertEqual(result[0], "deny")
+        self.assertIn("swap-flip", result[1])
+        self.assertEqual((self.root / "gh.log").read_text().strip(), "pr view 5 --json headRefOid,baseRefName")
+
     def test_stale_or_failed_receipt_asks(self):
         stale = {"status": "blocked", "code": "SOURCE_VERIFICATION_MISMATCH",
                  "acceptance": {"status": "blocked", "code": "SOURCE_VERIFICATION_MISMATCH"}}
@@ -139,6 +198,9 @@ class AgentGuardTests(unittest.TestCase):
         self.assertIsNone(self.decide("gh pr create --body " + shlex.quote(body), self.app))
         no_ui = body.replace("- Not verified in browser: 1Click auth is down.", "- n/a: no UI or user flow changed")
         self.assertIsNone(self.decide("gh pr create --body " + shlex.quote(no_ui), self.app))
+        self.coverage(not_exercised=["swap-flip"])
+        stated = body.replace("- Not verified in browser: 1Click auth is down.", "- Not browser-verified: CI-only toolkit change.")
+        self.assertIsNone(self.decide("gh pr create --body " + shlex.quote(stated), self.app))
 
     def test_screenshots_need_an_image_or_capture_failure(self):
         body = PROVEN.replace("![Swap settled](https://github.com/org/repo/blob/pr-assets/fix/after.png?raw=true)",
@@ -191,12 +253,16 @@ class AgentGuardTests(unittest.TestCase):
                         "cat > /tmp/body.md <<'EOF'\n- bun run test:e2e:local accountPasskeys\nEOF\ngit status"):
             self.assertIsNone(self.decide(command, self.app), command)
 
-    def checks(self, command, checks=(), mode=""):
-        timeout = 0.5 if mode == "hang" else 10
+    def fake_gh(self):
         bin_dir = self.root / "bin"
         bin_dir.mkdir(exist_ok=True)
         (bin_dir / "gh").write_text(FAKE_GH)
         (bin_dir / "gh").chmod(0o755)
+        return bin_dir
+
+    def checks(self, command, checks=(), mode=""):
+        timeout = 0.5 if mode == "hang" else 10
+        bin_dir = self.fake_gh()
         log = self.root / "gh.log"
         env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "FAKE_GH_LOG": str(log), "FAKE_GH_MODE": mode,
                "FAKE_GH_CHECKS": json.dumps(list(checks))}

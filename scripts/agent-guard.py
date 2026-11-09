@@ -17,7 +17,7 @@ HEAVY_SCRIPTS = {"test", "build", "typecheck"}
 TEST_TOOLS = {"vitest", "jest"}
 TEST_FILE = re.compile(r"\.(?:test|spec)\.[cm]?[jt]sx?$")
 RECEIPT = re.compile(r"<!--\s*verification-job:\s*([a-f0-9-]{36})\s*-->")
-NOT_CLAIMED = re.compile(r"^\s*[-*]\s+(?:not verified in browser|n/a)\b", re.I | re.M)
+NOT_CLAIMED = re.compile(r"^\s*[-*]\s+(?:not verified in browser|not browser-verified|n/a)\b", re.I | re.M)
 IMAGE = re.compile(r"!\[[^\]]*\]\([^)\s]+\)|<img\s[^>]*src=")
 CAPTURE_FAILED = re.compile(r"^\s*[-*]?\s*capture failed:", re.I | re.M)
 QUEUE_TIMEOUT = 60
@@ -70,8 +70,12 @@ def option(words, *names):
     return None
 
 
+def browser_section(body):
+    return re.search(r"(?ms)^## Verified in browser\s*$(.*?)(?=^## |\Z)", body)
+
+
 def evidence_errors(body):
-    section = re.search(r"(?ms)^## Verified in browser\s*$(.*?)(?=^## |\Z)", body)
+    section = browser_section(body)
     if not section:
         return ["missing `## Verified in browser` section"]
     errors = []
@@ -94,6 +98,60 @@ def claimed(section):
     """Whether the browser section claims proof rather than stating it was not checked."""
     bullets = re.findall(r"(?m)^\s*[-*]\s+\S.*$", section)
     return any(not NOT_CLAIMED.match(bullet) for bullet in bullets)
+
+
+def git(here, *args):
+    result = subprocess.run(["git", "-C", str(here), *args], capture_output=True, text=True, timeout=5)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def pr_target(words, here):
+    """The head commit and base branch the PR body will describe."""
+    if words[2] == "edit":
+        number = words[3:4] if words[3:4] and not words[3].startswith("-") else []
+        command = ["gh", "pr", "view", *number, "--json", "headRefOid,baseRefName"]
+        repo = option(words, "--repo", "-R")
+        try:
+            result = subprocess.run(command + (["--repo", repo] if repo else []), cwd=here, capture_output=True,
+                                    text=True, timeout=CHECKS_TIMEOUT)
+            pr = json.loads(result.stdout)
+            return pr["headRefOid"], pr["baseRefName"]
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+            return None, None
+    default = (git(here, "symbolic-ref", "--short", "refs/remotes/origin/HEAD") or "origin/main").removeprefix("origin/")
+    return git(here, "rev-parse", "HEAD"), option(words, "--base", "-B") or default
+
+
+def coverage_problems(words, here):
+    """Browser bullets need the PR head's coverage receipt with every changed control exercised or waived."""
+    head, base = pr_target(words, here)
+    if not head:
+        return ["could not read the PR's head commit"]
+    fix = f"run `cd <app> && npm --prefix {TOOLKIT} run queue -- coverage --base origin/{base}` on {head[:12]}"
+    common = git(here, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    receipts = sorted(Path(common, "near-verify", "coverage", head).glob("*.json")) if common else []
+    if not receipts:
+        return [f"no coverage receipt for head {head[:12]}; {fix}"]
+    fork = git(here, "merge-base", head, f"origin/{base}")
+    if not fork:
+        return [f"origin/{base} has no common commit with {head[:12]} here; `git fetch origin {base}`"]
+    problems = []
+    for file in receipts:
+        try:
+            receipt = json.loads(file.read_text())
+        except (OSError, ValueError):
+            problems.append(f"{file} is unreadable; {fix}")
+            continue
+        app = receipt.get("app", file.stem)
+        if git(here, "merge-base", "--is-ancestor", str(receipt.get("base")), fork) is None:
+            problems.append(f"{app}: the receipt compares with {str(receipt.get('base'))[:12]}, not the PR's base "
+                            f"origin/{base}, so it can miss this PR's changes; {fix}")
+            continue
+        unexercised = [control for row in receipt.get("files", []) for control in row.get("notExercised", [])]
+        unexercised += receipt.get("features", {}).get("withoutPassingRun", [])
+        if unexercised:
+            problems.append(f"{app}: exercise or `--waive ID=REASON` these changed controls: {', '.join(unexercised)}")
+    return problems
 
 
 def queue_json(args, cwd):
@@ -281,6 +339,13 @@ def decide(payload):
                 if errors:
                     return ("deny", "PR body fails the ship evidence gate: " + "; ".join(errors)
                             + ". Fill Screenshots and Verified in browser per the ship skill before opening or updating the PR.")
+                if claimed(browser_section(body)[1]):
+                    uncovered = coverage_problems(words, here)
+                    if uncovered:
+                        return ("deny", "The PR claims browser proof, but no passing run is shown to exercise what it "
+                                        "changed: " + "; ".join(uncovered) + ". A VERIFIED run that never touched the "
+                                        "changed control let defects ship before. Otherwise write "
+                                        "`- Not browser-verified: <reason>`.")
                 problems = receipt_problems(body, here)
                 if problems:
                     return ("ask", "The PR claims browser proof, but its verification receipt does not show a pass on the "
