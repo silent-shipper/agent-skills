@@ -4,6 +4,8 @@ The lead filters rather than votes.
 
 ## Validate before accepting
 
+- Rerun each finding's proof command. Keep it only when the output shows the failure; a finding proven only by reading code is at most `Noted`.
+
 - Trace the actual caller and input path for hypothetical failures.
 - Treat multi-reviewer agreement as a prioritization signal, not proof.
 - Scrutinize lone-reviewer security and correctness claims even without consensus.

@@ -43,7 +43,11 @@ the user authorized that action. Do not add a `Co-Authored-By` trailer.
 - Before the first push of a behavior change, review the final diff with
   `interrogate`, including one reviewer from a different provider family when
   available. Fix confirmed Act-on findings, reverify, and review the changed
-  paths again. Stop after a round with no Act-on finding or after 3 rounds, and
+  paths again. Size the re-check to the new diff: after a rebase, a
+  conflict resolution or a minor fix, run one focused verifier at the new head;
+  a wording-only change needs none. Run the full review and browser
+  verification again only for new behavior, a redesign or a large new diff.
+  Stop after a round with no Act-on finding or after 3 rounds, and
   list what remains in the result. Honor a requested round count. Skip this for
   docs-only changes.
 - When anything visible in the UI changes, capture and inspect a screenshot of

@@ -97,4 +97,5 @@ gh api --paginate repos/<owner>/<repo>/pulls/<number>/comments
   completed attempts and the exact missing action or authorization. Do not
   bypass branch protection, weaken assertions, or change secrets to force green.
 - If the PR head changes, reassess the changed diff and verify checks for the
-  new revision. Do not use an earlier green revision as proof of the latest one.
+  new revision. A rebase, conflict fix or minor fix gets one focused verifier;
+  a wording-only change gets none. Do not use an earlier green revision as proof of the latest one.

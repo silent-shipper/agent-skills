@@ -124,7 +124,7 @@
       "codex_enabled": true,
       "upstream": {
         "repo": "cursor/plugins",
-        "commit": "88d47514b82e7c44f00f2b2a72ff6dd12158038c",
+        "commit": "ab1f702ce8e8b6557edb56b09f52cde8bfb83f17",
         "paths": [
           "pstack/skills/poteto-mode/playbooks/babysit.md"
         ]
@@ -158,7 +158,7 @@
       "codex_enabled": true,
       "upstream": {
         "repo": "cursor/plugins",
-        "commit": "88d47514b82e7c44f00f2b2a72ff6dd12158038c",
+        "commit": "ab1f702ce8e8b6557edb56b09f52cde8bfb83f17",
         "paths": [
           "pstack/skills/poteto-mode/SKILL.md",
           "pstack/skills/poteto-mode/playbooks/investigation.md",

@@ -1,13 +1,13 @@
 ---
 name: interrogate
-description: Run an adversarial multi-reviewer examination of a diff, branch, design, or selected files, then synthesize findings with lead judgment. Use when the user says "interrogate", "adversarial review", "multi-agent review", "challenge this", "find blind spots", or "tear this apart". Reviewers are read-only; applying findings requires existing authorization for fixes.
+description: Run an adversarial multi-reviewer examination of a diff, branch, design, or selected files, then synthesize findings with lead judgment. Use when the user says "interrogate", "adversarial review", "multi-agent review", "challenge this", "find blind spots", or "tear this apart". Reviewers prove findings with runs and never edit the reviewed checkout; applying findings requires existing authorization for fixes.
 ---
 
 # Interrogate
 
 Send the same intent, scope, and rubric to multiple independent reviewers, then filter their findings into a pragmatic verdict. This skill explicitly calls for parallel subagents when collaboration tools are available.
 
-Keep reviewers read-only. A review request alone does not authorize code changes. If the session already authorizes implementation or fixes, the lead may apply confirmed in-scope findings after synthesis and reverify; otherwise return the verdict. Do not ask again for authorization already given.
+Reviewers try to break the change, and a finding survives only when a run proves it. Reviewers never edit the reviewed checkout; they keep repro scripts and scratch tests in a temporary directory or their own worktree. A review request alone does not authorize code changes. If the session already authorizes implementation or fixes, the lead may apply confirmed in-scope findings after synthesis and reverify; otherwise return the verdict. Do not ask again for authorization already given.
 
 ## Determine scope and intent
 
@@ -25,11 +25,11 @@ Use inherited models by default. Use model overrides only when the user or gover
 
 ## Synthesize
 
-Parse and deduplicate all findings. Agreement by two or more independent reviewers is stronger evidence, not automatic truth. Lone-reviewer security or correctness findings still deserve careful tracing. Record explicit disagreements.
+Rerun each finding's command yourself. Keep a finding only when the output shows the failure and the failure breaks the intent; drop the rest, and merge findings that share a root cause. A finding nobody could prove with a run goes to `Noted` at most, never `Act on`. Then parse and deduplicate the kept findings. Agreement by two or more independent reviewers is stronger evidence, not automatic truth. Lone-reviewer security or correctness findings still deserve careful tracing. Record explicit disagreements.
 
 Read [lead-judgment.md](references/lead-judgment.md). The lead must validate important execution paths against the repository context and classify every distinct finding:
 
-- **Act on:** confirmed correctness, security, regression, or material maintainability issue that should block shipping.
+- **Act on:** a problem shown by a failing run at the head or a doc line the change made wrong: a bug a user would hit, a failed gate or a wrong shipped doc. A problem the base branch already has, whether trunk or the PR below in a stack, blocks only when the change copies it or newly reaches it.
 - **Consider:** legitimate tradeoff whose benefit may not outweigh its cost now.
 - **Noted:** valid context or low-impact observation with no current action.
 - **Dismissed:** incorrect, hypothetical without a reachable path, nitpicky, outside scope, or missing known context.

@@ -115,7 +115,9 @@ changed a decision and the choice it changed.
   consolidated scope: the original brief, every later directive, and the prior
   agent's report and branch. Reuse a running agent only when the work needs state
   that is costly to move, such as its uncommitted changes or a running process.
-- Pass file pointers and success criteria, not pasted context. Run independent
+- Open every brief with the user's goal and the problem it solves, in your
+  own words, so the subagent does not drift to a nearby task. Pass file
+  pointers and success criteria, not pasted context. Run independent
   agents in the background and concurrently.
 - Pick the model per role from the live catalog (`orchestrator_capabilities` in
   T3), never a remembered list. Code delegates inherit the parent model; drop

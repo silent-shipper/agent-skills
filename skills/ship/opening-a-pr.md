@@ -10,6 +10,8 @@ field labels. Put repository-required details in the relevant sections:
 
 ## Summary
 
+<one sentence: the user's goal and the problem this solves>
+
 <diagram, diff-sketch, or tree>
 
 ## Screenshots
