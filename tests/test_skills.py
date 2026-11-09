@@ -128,6 +128,23 @@ class SkillInstallationTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, '0 valid roots'):
                     skills.toolkit_root()
 
+    def test_toolkit_owned_skill_links_to_the_default_toolkit_checkout(self):
+        link = self.home / '.claude/skills/create-verification'
+        with patch.dict(os.environ, {}, clear=True):
+            skills.install()
+            self.assertFalse(link.exists())
+            self.assertNotIn('create-verification', (self.home / '.codex/config.toml').read_text())
+        toolkit = self.home / 'Projects/metamask-e2e'
+        (toolkit / 'docs').mkdir(parents=True)
+        (toolkit / 'package.json').write_text(json.dumps({'scripts': {'queue': 'q', 'verify:app': 'v'}}))
+        (toolkit / 'docs/prompt-verification.md').write_text('Guide\n')
+        (toolkit / 'skills/create-verification').mkdir(parents=True)
+        (toolkit / 'skills/create-verification/SKILL.md').write_text('---\nname: create-verification\ndescription: Verify.\n---\n')
+        with patch.dict(os.environ, {'METAMASK_E2E_ROOT': str(self.home / 'task-toolkit')}, clear=True):
+            skills.install()
+        self.assertEqual(link.resolve(), (toolkit / 'skills/create-verification').resolve())
+        self.assertIn(str(self.home / '.codex/skills/create-verification/SKILL.md'), (self.home / '.codex/config.toml').read_text())
+
     def test_install_registers_agent_guard_once_and_keeps_settings(self):
         settings = self.home / ".claude/settings.json"
         settings.parent.mkdir(parents=True)

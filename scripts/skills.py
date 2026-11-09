@@ -29,10 +29,21 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def skill_source(skill):
+    """The directory a skill is installed from: this repository, or the default toolkit checkout that owns it."""
+    if skill.get("source") != "toolkit":
+        return REPO / "skills" / skill["name"]
+    try:
+        return toolkit_root(configured="") / "skills" / skill["name"]
+    except ValueError:
+        return None
+
+
 def reference_errors(skills):
     errors = []
     for skill in skills:
-        for path in (REPO / "skills" / skill["name"]).rglob("*.md"):
+        source = skill_source(skill)
+        for path in source.rglob("*.md") if source else ():
             text = re.sub(r"(?ms)^\s*(`{3,}|~{3,}).*?^\s*\1\s*$", "", path.read_text())
             for target in re.findall(r"\]\(([^)]+)\)", text):
                 target = target.strip().split(" ", 1)[0].strip("<>")
@@ -40,12 +51,12 @@ def reference_errors(skills):
                 if parsed.scheme or not parsed.path or parsed.path.startswith("/") or "$" in target:
                     continue
                 if not (path.parent / unquote(parsed.path)).exists():
-                    errors.append("Missing reference: " + str(path.relative_to(REPO)) + " -> " + target)
+                    errors.append("Missing reference: " + str(path.relative_to(REPO) if REPO in path.parents else path) + " -> " + target)
     return errors
 
 
-def toolkit_root():
-    configured = os.environ.get("METAMASK_E2E_ROOT")
+def toolkit_root(configured=None):
+    configured = os.environ.get("METAMASK_E2E_ROOT") if configured is None else configured
     candidates = [Path(configured).expanduser()] if configured else [
         HOME_DIR / "Desktop/Projects/metamask-e2e", HOME_DIR / "Projects/metamask-e2e"]
     valid = []
@@ -144,7 +155,7 @@ def identity():
             continue
         source.update(str(relative).encode() + b"\0" + hashlib.sha256(path.read_bytes()).digest())
     return {"repo_head": head, "dirty_files": dirty, "source_sha256": source.hexdigest(), "manifest_sha256": digest(REPO / "manifest.json") if (REPO / "manifest.json").is_file() else None,
-            "skill_sha256": {s["name"]: digest(REPO / "skills" / s["name"] / "SKILL.md") for s in (manifest() if (REPO / "manifest.json").is_file() else [])}}
+            "skill_sha256": {s["name"]: digest(skill_source(s) / "SKILL.md") for s in (manifest() if (REPO / "manifest.json").is_file() else []) if skill_source(s)}}
 
 
 def record_status(status, reason=None):
@@ -171,7 +182,11 @@ def manifest():
         name = skill["name"]
         assert re.fullmatch(r"[a-z0-9-]+", name) and name not in names, name
         assert skill["codex_enabled"] is True, "Disabled skills must be removed from the synced manifest: " + name
-        content = (REPO / "skills" / name / "SKILL.md").read_text()
+        assert skill.get("source") in (None, "toolkit"), name
+        source = skill_source(skill)
+        if source is None:
+            continue
+        content = (source / "SKILL.md").read_text()
         front = re.match(r"^---\n(.*?)\n---\n", content, re.S)
         field = re.search(r"^name:\s*(.*?)\s*$", front[1], re.M) if front else None
         assert field and field[1].strip("\"'") == name, name
@@ -220,9 +235,9 @@ def retired_links(skills):
 def managed_paths(skills):
     paths = {}
     for skill in skills:
-        name = skill["name"]
-        for root in roots():
-            paths[HOME_DIR / root / name] = REPO / "skills" / name
+        source = skill_source(skill)
+        for root in roots() if source else ():
+            paths[HOME_DIR / root / skill["name"]] = source
     for path in (".agents/surge-defaults.md", ".codex/AGENTS.md", ".claude/CLAUDE.md"):
         paths[HOME_DIR / path] = REPO / "surge-defaults.md"
     paths[HOME_DIR / ".agents/check-skills.py"] = REPO / "scripts/check-skills.py"
@@ -249,7 +264,7 @@ def skill_config(text, skills, retired=()):
             text = text[:match.start()] + text[match.end():]
     additions = "\n".join(
         '[[skills.config]]\npath = ' + json.dumps(str(HOME_DIR / ".codex/skills" / s["name"] / "SKILL.md"))
-        + '\nenabled = ' + str(s["codex_enabled"]).lower() + '\n' for s in skills
+        + '\nenabled = ' + str(s["codex_enabled"]).lower() + '\n' for s in skills if skill_source(s)
     )
     return text.rstrip() + "\n\n" + additions
 
@@ -320,7 +335,9 @@ def check(installation_only=False, require_sync=False):
     config = HOME_DIR / ".codex/config.toml"
     entries = list(configured(config.read_text() if config.exists() else ""))
     for skill in skills:
-        source = REPO / "skills" / skill["name"] / "SKILL.md"
+        if not skill_source(skill):
+            continue
+        source = skill_source(skill) / "SKILL.md"
         values = [enabled for _, path, enabled in entries if path and path.resolve() == source]
         if values != [skill["codex_enabled"]]:
             errors.append("Incorrect Codex discovery setting: " + skill["name"])

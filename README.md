@@ -42,7 +42,7 @@ text, so installed hashes do not prove which text a running agent already read.
 - `benchmark-checklist` — qualify performance and reliability measurements
 - `blast-radius` — prove what a change could break beyond the diff
 - `correct` — turn repeated agent mistakes into enforced structure
-- `create-verification` — verify supported Defuse changes
+- `create-verification` — verify supported Defuse changes (owned by the toolkit; see below)
 - `grill-to-goal` — clarify goals and decisions
 - `improve-codebase-architecture` — find architectural improvements
 - `how` — explain subsystem flow and ownership from evidence
@@ -133,6 +133,12 @@ the same files and links in place.
 `manifest.json` lists only the enabled skills to sync, with `codex_enabled: true`
 for each entry. Both providers receive the same set. Installation changes only
 the managed personal skill entries in Codex's config and preserves other settings.
+A skill with `"source": "toolkit"` lives in the verification toolkit, not
+here: the installer links it from the default toolkit checkout's `skills/`
+directory (ignoring `METAMASK_E2E_ROOT`) and skips it when that checkout is
+missing. Change it with a toolkit PR, so the skill and the commands it
+describes ship together.
+
 When a skill is removed from the manifest and repository, the installer backs up
 and removes its old repo-managed links and its Codex discovery entry. Unrelated
 local skills are preserved.

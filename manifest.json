@@ -44,7 +44,8 @@
     },
     {
       "name": "create-verification",
-      "codex_enabled": true
+      "codex_enabled": true,
+      "source": "toolkit"
     },
     {
       "name": "grill-to-goal",
