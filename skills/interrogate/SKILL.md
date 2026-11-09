@@ -47,6 +47,12 @@ Return:
 5. **Noted** — concise observations.
 6. **Dismissed** — rejected claims and why.
 7. **Agreement map** — consensus, divergence, and what it implies.
+8. **Draft comment** — the ready-to-paste PR comment for the Act on and
+   worthwhile Consider findings, written per unslop's PR comment rules.
+
+In chat, show only the verdict line, one bullet per Act on finding with its
+fix, and the draft comment, within the reply limit in the user's defaults.
+Write the full verdict (all sections above) to a file and link it.
 
 When findings will be posted to a PR, first fetch existing review and issue
 comments and drop findings already raised. Each posted comment cites the line

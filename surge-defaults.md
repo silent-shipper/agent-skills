@@ -19,8 +19,12 @@ requested scope and checkpoint; project guidance supplies domain rules.
   skill requests and reuse their completed work instead of restarting the chain.
 - Define observable acceptance criteria. Run checks proportional to the change
   and add regression coverage for durable behavior or demonstrated bugs. For
-  supported Defuse work, use `create-verification`. Report passed, failed and
-  blocked proof separately; a tool run alone does not prove the feature.
+  supported Defuse work, use `create-verification`. "Verify" always means
+  running the change in a real browser; tests and CI are supporting evidence,
+  and when a browser run isn't possible, report verification as not done.
+  Report passed, failed and blocked proof separately; a tool run alone does
+  not prove the feature. In defuse-frontend-monorepos, lint guards go in
+  oxlint config or oxlint jsPlugins, never Biome.
 - Finish authorized implementation and supported fixes. Repeat design, review
   or tests when new evidence requires it. Completion means the requested behavior
   is proven, confirmed blockers are resolved and material gaps are stated;
@@ -37,6 +41,13 @@ requested scope and checkpoint; project guidance supplies domain rules.
   Standing grants: spending from the funded MetaMask test account for
   verification, and finishing every PR when asked to resolve a stack. Shipping
   is scoped to the repository the user named; ask before changing another.
+- Every reply first answers the user's latest question in one line. When the
+  user asks something while other work is running, answer it before reporting
+  on that work. Then add at most 5 short bullets, about 120 words in total,
+  with no tables or sub-bullets. Put longer material (full reviews, roadmaps,
+  data) in a file and link it; expand only when the user asks for detail.
+- Approve a PR with an empty body (`gh pr review N --approve`); anything the
+  author needs goes in a separate unslop comment the user has seen first.
 - Lead with the result or decision. For a plan, implementation or PR review,
   automatically give a short `status` catch-up: what the change does, why it is
   worth doing, meaningful proof, remaining gaps and what waits on the user.

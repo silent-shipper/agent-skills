@@ -67,7 +67,7 @@ Rule numbers are stable ids that other skills cite. A removed rule leaves a gap.
 Write as the user, in first person, the way they would type it to a teammate.
 
 - Lead with the ask as a suggestion ("I think it'd be better to…, maybe we…?"), then the one fact that justifies it. Keep a single point under about 80 words. For several points, write one lead line and numbered one-sentence points, and stop after the last point.
-- An approval is one line: "Looks good" plus the one ask or the person to tag. Don't summarize the PR.
+- An approval has an empty body. When the user asks to tag someone or add a note, the body is that one line only. Don't summarize the PR.
 - Leave out praise, sign-offs, FYIs, side findings, CI, bot, approval or rebase status, and how the work was checked or what wasn't, unless asked. A verification note lists only the behaviors checked in a real browser.
 - Link every PR you mention.
 - Show the exact text and wait for the go-ahead before posting, unless the user already said to post it.
