@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Commit, push, open or update a PR, follow CI, and address consequential CodeRabbit and Codex PR feedback when the user requests shipping, "ship it", "push this", "open a PR", "commit and push", or PR status such as "check on PR X", "babysit this" or "get it green". Respect local-only checkpoints.
+description: Commit, push, open or update a PR, follow CI, and address consequential CodeRabbit and Codex PR feedback when the user requests shipping, "ship it", "push this", "open a PR", "commit and push", or PR status such as "check on PR X", "babysit this" or "get it green". Also use for standalone requests to approve a PR, approve only if stated conditions hold, assess merge readiness, or merge a PR, even when no commit or push is requested. Respect local-only checkpoints.
 ---
 
 # Ship

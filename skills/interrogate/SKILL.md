@@ -41,7 +41,7 @@ Keep the `Act on` section small and decisive. Explain dismissals so the user can
 Return:
 
 1. **What it does** — two plain sentences without code names: what changes for someone using the app today (say "nothing reachable today" if so), and what prompted it (the linked issue or incident, or "not stated").
-2. **Scope and reviewers** — artifact reviewed and reviewer count.
+2. **Scope and reviewers** — artifact reviewed, reviewer count, executed checks, exercised behavior, mocked or bypassed dependencies, and unproven acceptance criteria.
 3. **Act on** — evidence, location, impact, and which reviewers raised it.
 4. **Consider** — evidence and tradeoff.
 5. **Noted** — concise observations.
@@ -53,6 +53,10 @@ Return:
 In chat, show only the verdict line, one bullet per Act on finding with its
 fix, and the draft comment, within the reply limit in the user's defaults.
 Write the full verdict (all sections above) to a file and link it.
+Keep clearance claims within that evidence scope in both the full verdict and
+chat. A known regression remains a regression when classified `Consider`;
+accepting its tradeoff does not justify "no regressions." State material
+unproven acceptance criteria beside the recommendation.
 
 When findings will be posted to a PR, first fetch existing review and issue
 comments and drop findings already raised. Each posted comment cites the line

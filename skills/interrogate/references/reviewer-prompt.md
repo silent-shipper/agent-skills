@@ -12,6 +12,8 @@ For every finding return:
 - **Proof:** the exact command, the output it printed, and the output the intent requires. Leave out anything you could not prove with a run, or list it separately as unproven.
 - **Suggestion:** only when there is a clear, scoped alternative.
 
-Read surrounding code needed to validate a claim. Distinguish broken behavior from personal preference. Do not raise hypothetical nulls, races, or injections without showing how the state or input is reachable. Do not praise the work or pad the review. If nothing is wrong, report `No findings`.
+Read surrounding code needed to validate a claim. Distinguish broken behavior from personal preference. Do not raise hypothetical nulls, races, or injections without showing how the state or input is reachable. Do not praise the work or pad the review. If no finding survives, report `No findings in the exercised scope`.
 
 Output a structured list that the lead can deduplicate. Keep each finding independently understandable.
+
+Always report the checks run and their results, the operations and input/state variants exercised, mocked or bypassed dependencies, and required acceptance criteria not exercised. Mark unexecuted criteria `Unproven`. A passing check proves only the behavior and boundaries it exercised.

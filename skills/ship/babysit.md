@@ -67,8 +67,10 @@ gh api --paginate repos/<owner>/<repo>/pulls/<number>/comments
   communication with a long sleep. A slow check alone is not a stopping reason.
 - At the first CI check, each subsequent poll, and just before completion,
   fetch all pages of PR conversation comments, review summaries and inline
-  review comments. Inspect CodeRabbit and Codex feedback using the actual
-  author/app identity. Recheck edited comments as well as new ones; track
+  review comments. Inspect human reviewer, CodeRabbit and Codex feedback using
+  the actual author/app identity; an unresolved correctness or security thread
+  at the current head blocks approval and merge until it is fixed or dismissed
+  with evidence. Recheck edited comments as well as new ones; track
   comment IDs and dispositions to avoid repeating completed triage.
 - Validate each finding against the latest PR head, surrounding code and
   intended behavior. Inspect thread context and resolution/outdated state when
