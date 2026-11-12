@@ -15,6 +15,8 @@ Identify the exact review target from the user: selected files, supplied patch, 
 
 State the author's intent in one clear paragraph using the request, commit or PR description, and code evidence. Reviewers challenge execution against that intent; they do not redefine the goal. Ask only when intent is materially ambiguous and cannot be recovered safely.
 
+For gated changes, describe the shipped default and the intended enabled behavior. Establish from the request whether the verdict concerns merging disabled, enabling, or releasing. Include the required operating modes in the shared review brief and verification plan. Evidence from the disabled mode supports that mode only; state any required mode that remains unexecuted beside the recommendation.
+
 ## Launch reviewers
 
 Track Scope, Review, Synthesize, and Verdict in the task plan.
@@ -40,7 +42,7 @@ Keep the `Act on` section small and decisive. Explain dismissals so the user can
 
 Return:
 
-1. **What it does** — two plain sentences without code names: what changes for someone using the app today (say "nothing reachable today" if so), and what prompted it (the linked issue or incident, or "not stated").
+1. **What it does** — two plain sentences without code names: what changes for users in the operating mode being reviewed, distinguishing the shipped default from intended enabled behavior for gated changes; and what prompted it (the linked issue or incident, or "not stated").
 2. **Scope and reviewers** — artifact reviewed, reviewer count, executed checks, exercised behavior, mocked or bypassed dependencies, and unproven acceptance criteria.
 3. **Act on** — evidence, location, impact, and which reviewers raised it.
 4. **Consider** — evidence and tradeoff.

@@ -46,6 +46,8 @@ requested scope and checkpoint; project guidance supplies domain rules.
   on that work. Then add at most 5 short bullets, about 120 words in total,
   with no tables or sub-bullets. Put longer material (full reviews, roadmaps,
   data) in a file and link it; expand only when the user asks for detail.
+  A requested list, board or agenda keeps every in-scope item; shorten each
+  item instead of dropping items to fit the cap.
 - Approve a PR with an empty body (`gh pr review N --approve`); anything the
   author needs goes in a separate unslop comment the user has seen first.
 - Lead with the result or decision. For a plan, implementation or PR review,

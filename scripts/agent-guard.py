@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Code PreToolUse guard for PR evidence, push targets, merge checks and the shared test queue."""
+"""Claude Code PreToolUse guard for PR evidence, push targets, commit identity, merge checks and the shared test queue."""
 import json
 import os
 import re
@@ -29,6 +29,8 @@ HEREDOC = re.compile(r"(<<-?\s*(['\"]?)([A-Za-z_]\w*)\2)([^\n]*)\n.*?^\s*\3\s*$"
 REDIRECT = re.compile(r"^\d*(?:>>?|<)")
 GREEN = {"pass", "skipping"}
 CHECKS_TIMEOUT = 20
+LOCAL_EMAIL = re.compile(r"@(?:localhost|[^@\s]+\.(?:local|localdomain))$", re.I)
+OUTGOING_LIMIT = 200
 MERGE_VALUE_OPTIONS = {"-A", "--author-email", "-b", "--body", "-F", "--body-file", "--match-head-commit",
                        "-R", "--repo", "-t", "--subject"}
 
@@ -242,6 +244,62 @@ def browser_test(words):
     return None
 
 
+def git_command(words):
+    """The subcommand and `-c key=value` overrides of a git invocation, after leading VAR=value assignments."""
+    start = 0
+    while start < len(words) and re.match(r"^\w+=", words[start]):
+        start += 1
+    if words[start:start + 1] != ["git"]:
+        return None, {}
+    overrides = {w.split("=", 1)[0]: w.split("=", 1)[1] for w in words[:start]}
+    rest = iter(words[start + 1:])
+    for word in rest:
+        if word in ("-C", "-c", "--git-dir", "--work-tree"):
+            value = next(rest, "")
+            if word == "-c" and "=" in value:
+                key, val = value.split("=", 1)
+                overrides[key.lower()] = val
+        elif not word.startswith("-"):
+            return word, overrides
+    return None, overrides
+
+
+def commit_identity_problem(overrides, target):
+    """A commit authored with an empty or machine-local email, which Vercel rejects for preview deployments."""
+    try:
+        email = (overrides.get("GIT_AUTHOR_EMAIL") or overrides.get("user.email") or os.environ.get("GIT_AUTHOR_EMAIL")
+                 or git(target, "config", "user.email") or "")
+        if email and not LOCAL_EMAIL.search(email):
+            return None
+        origin = (git(target, "config", "--show-origin", "--get", "user.email") or "").split("\t")[0]
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if origin.startswith("file:.git/config") or origin.endswith("/.git/config"):
+        fix = ("this repo's .git/config overrides your global identity for every worktree; remove it with "
+               "`git config --local --unset user.email` and `git config --local --unset user.name`")
+    else:
+        fix = "set a real identity with `git config --global user.email <github noreply address>`"
+    return (f"This commit would be authored as `{email or 'an auto-detected host address'}`. Vercel rejects such "
+            f"commits, which blocked preview deployments on two PRs; {fix}. Automation that needs its own identity "
+            "passes it per command with `git -c user.name=... -c user.email=... commit`.")
+
+
+def outgoing_identity_problem(target):
+    """Unpushed commits on HEAD authored or committed with a machine-local email."""
+    try:
+        log = git(target, "log", f"-n{OUTGOING_LIMIT}", "--format=%h%x09%ae%x09%ce", "HEAD", "--not", "--remotes")
+    except (OSError, subprocess.SubprocessError):
+        return None
+    bad = [line.split("\t") for line in (log or "").splitlines()
+           if any(not email or LOCAL_EMAIL.search(email) for email in line.split("\t")[1:])]
+    if not bad:
+        return None
+    emails = sorted({email for _, *pair in bad for email in pair if not email or LOCAL_EMAIL.search(email)})
+    return (f"{len(bad)} unpushed commit(s) ({', '.join(sha for sha, *_ in bad[:5])}) use {', '.join(emails)}, which "
+            "Vercel rejects for previews. Fix the identity first (`git config --show-origin user.email`), then rewrite "
+            f"them: `git rebase -r {bad[-1][0]}^ --exec 'git commit --amend --no-edit --reset-author'`.")
+
+
 def merge_target(words):
     rest = iter(words[3:])
     for word in rest:
@@ -314,6 +372,11 @@ def decide(payload):
         if words[0] == "git" and option(words, "-C"):
             target = (here / os.path.expanduser(option(words, "-C"))).resolve()
         is_push = words[0] == "git" and "push" in words
+        subcommand, overrides = git_command(words)
+        if subcommand == "commit":
+            problem = commit_identity_problem(overrides, target)
+            if problem:
+                return ("deny", problem)
         is_pr = words[:3] in (["gh", "pr", "create"], ["gh", "pr", "edit"])
         if is_push or is_pr or words[:3] == ["gh", "pr", "merge"]:
             repo = (option(words, "--repo", "-R") or "").lower() or remote(target)
@@ -321,6 +384,10 @@ def decide(payload):
             if repo and home and repo != home:
                 return ("ask", f"This session's repo is {home}, but this command targets {repo}. "
                                "Confirm the user named this repo as the target.")
+        if subcommand == "push":
+            problem = outgoing_identity_problem(target)
+            if problem:
+                return ("deny", problem)
         if words[:3] == ["gh", "pr", "merge"] and "--disable-auto" not in words:
             unfinished = unfinished_checks(words, here)
             if unfinished:

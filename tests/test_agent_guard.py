@@ -86,6 +86,47 @@ class AgentGuardTests(unittest.TestCase):
     def test_push_to_session_repo_is_allowed(self):
         self.assertIsNone(self.decide("git push origin main", self.e2e))
 
+    def commit_as(self, repo, email):
+        env = {**os.environ, "GIT_AUTHOR_NAME": "a", "GIT_AUTHOR_EMAIL": email,
+               "GIT_COMMITTER_NAME": "a", "GIT_COMMITTER_EMAIL": email}
+        subprocess.run(["git", "-C", str(repo), "commit", "-q", "--allow-empty", "-m", "x"], check=True, env=env)
+        return subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+
+    def test_commit_with_the_conflict_resolver_identity_is_denied(self):
+        # The repo-local identity that made Vercel reject preview deployments on two PRs.
+        subprocess.run(["git", "-C", str(self.app), "config", "user.email", "conflict-resolver@localhost"], check=True)
+        result = self.decide("git commit -m 'fix: thing'", self.app)
+        self.assertEqual(result[0], "deny")
+        self.assertIn("git config --local --unset user.email", result[1])
+        self.assertEqual(self.decide(f"git -C {self.app} commit -m x", self.e2e)[0], "deny")
+        self.assertEqual(self.decide("git commit -m x", self.app)[0], "deny")
+
+    def test_commit_with_a_host_derived_email_is_denied(self):
+        subprocess.run(["git", "-C", str(self.e2e), "config", "user.email", "surge@Surges-Mac-Mini.local"], check=True)
+        self.assertEqual(self.decide("git commit -m x", self.e2e)[0], "deny")
+
+    def test_commit_with_a_real_or_per_command_identity_is_allowed(self):
+        subprocess.run(["git", "-C", str(self.app), "config", "user.email", "1+dev@users.noreply.github.com"], check=True)
+        self.assertIsNone(self.decide("git commit -m x", self.app))
+        subprocess.run(["git", "-C", str(self.e2e), "config", "user.email", "conflict-resolver@localhost"], check=True)
+        self.assertIsNone(self.decide("git -c user.email=bot@users.noreply.github.com commit -m x", self.e2e))
+        self.assertIsNone(self.decide("GIT_AUTHOR_EMAIL=bot@users.noreply.github.com git commit -m x", self.e2e))
+        self.assertIsNone(self.decide("git log --grep commit", self.e2e))
+
+    def test_push_with_an_unpushed_local_identity_commit_is_denied(self):
+        self.commit_as(self.e2e, "1+dev@users.noreply.github.com")
+        bad = self.commit_as(self.e2e, "conflict-resolver@localhost")
+        result = self.decide("git push origin HEAD", self.e2e)
+        self.assertEqual(result[0], "deny")
+        self.assertIn(bad[:7], result[1])
+        self.assertIn("--reset-author", result[1])
+
+    def test_push_of_clean_or_already_pushed_commits_is_allowed(self):
+        bad = self.commit_as(self.e2e, "conflict-resolver@localhost")
+        subprocess.run(["git", "-C", str(self.e2e), "update-ref", "refs/remotes/origin/main", bad], check=True)
+        self.commit_as(self.e2e, "1+dev@users.noreply.github.com")
+        self.assertIsNone(self.decide("git push origin HEAD", self.e2e))
+
     def test_pr_without_evidence_is_denied(self):
         body = self.root / "body.md"
         body.write_text(UNPROVEN)

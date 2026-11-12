@@ -1,6 +1,6 @@
 ---
 name: status
-description: "Ultra-concise catch-up on what changed in this chat since the user's last message and what waits on them, under 80 words. Use for /status, 'where are we', 'catch me up' within this conversation, the end of a plan, implementation or PR review, and the final reply of a long or unattended run."
+description: "Give a concise catch-up or a complete current snapshot of an existing board, roadmap or agenda. Use for /status, 'where are we', 'catch me up' within this conversation, requests to refresh or condense an existing board, roadmap or agenda, the end of a plan, implementation or PR review, and the final reply of a long or unattended run. Keep narrative under 80 words without dropping requested items."
 ---
 
 # Status
@@ -12,10 +12,12 @@ available on request; they do not go in the reply.
 
 ## Gather
 
-Stay read-only. Collect what changed since the user's last message: your work,
-subagent reports and anyone else's messages. Check the live state of each PR,
-CI run or agent this chat touched, and check every number against its source.
-Past sessions and other threads belong to `recall`.
+Stay read-only. Choose a delta update or a complete snapshot from the request.
+For a refresh or condensed version of an existing list, collect the complete
+current state within its requested scope. For a delta update, collect changes
+since the user's last message: your work, subagent reports and anyone else's
+messages. Check the relevant live PR, CI and agent state, and check every number
+against its source. Past sessions and other threads belong to `recall`.
 
 A decision is a call only the user can make: a product choice, an approval, an
 irreversible action, or access you lack. Work you can still do is not one.
@@ -36,10 +38,14 @@ Files: N total — T tests, C code
 
 - At most 80 words above **Needs you**. At most 3 change bullets; merge
   related changes and drop anything the user would not miss.
-- When the chat covers several PRs, replace the change bullets with one line
-  per PR under bold **Ready to merge** and **Fix before merging** groups,
-  leaving out an empty group. Each line is the linked PR, a few words naming
-  it, and the one thing it needs. These lines don't count toward the word cap.
+- When the request refreshes or condenses an existing board, roadmap or agenda,
+  replace the change bullets with the complete current list. Shorten each
+  item's explanation, not the list of in-scope items. Give each item its
+  current state and next action or decision, where applicable. These item
+  lines are outside the narrative word cap and three-change-bullet limit.
+- For several PRs, use one linked line per independent PR or stack and preserve
+  the requested readiness groups. A stack is one decision unit; link its member
+  PRs.
 - One **Needs you** line per decision, never dropped to save words; combine
   decisions that share a call. Leave out low risk; state a real risk in a few
   words.
