@@ -52,6 +52,17 @@
       "codex_enabled": true
     },
     {
+      "name": "hill-climb",
+      "codex_enabled": true,
+      "upstream": {
+        "repo": "Bil0000/Hill-Climb",
+        "commit": "551c997e9eb3ae81fed9edf1d8a66bd32cd0dbf8",
+        "paths": [
+          "skills/hill-climb"
+        ]
+      }
+    },
+    {
       "name": "how",
       "codex_enabled": true,
       "upstream": {

@@ -1,6 +1,6 @@
 # Shared agent skills
 
-Private source of truth for Surge's 25 enabled personal skills and coding defaults on the
+Private source of truth for Surge's 26 enabled personal skills and coding defaults on the
 MacBook Pro and Mac mini. Codex and Claude use links to the same checkout.
 
 ## Current setup
@@ -11,8 +11,8 @@ device only after publication and a successful sync:
 
 | Device | Codex | Claude Code |
 | --- | --- | --- |
-| MacBook Pro | 25 enabled personal skills | The same 25 personal skills |
-| Mac mini | 25 enabled personal skills | The same 25 personal skills |
+| MacBook Pro | 26 enabled personal skills | The same 26 personal skills |
+| Mac mini | 26 enabled personal skills | The same 26 personal skills |
 
 Codex, Claude Code, and an existing Claude Alt home share `surge-defaults.md`.
 Credentials and provider login/configuration are never synced. An Alt home is
@@ -45,6 +45,7 @@ text, so installed hashes do not prove which text a running agent already read.
 - `create-verification` — verify supported Defuse changes (owned by the toolkit; see below)
 - `grill-to-goal` — clarify goals and decisions
 - `improve-codebase-architecture` — find architectural improvements
+- `hill-climb` — reach a scorable goal in locked-check steps that keep wins and undo losses
 - `how` — explain subsystem flow and ownership from evidence
 - `interrogate` — adversarial review
 - `karpathy-guidelines` — simple, focused coding
