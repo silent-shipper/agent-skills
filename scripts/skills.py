@@ -64,13 +64,13 @@ def toolkit_root(configured=None):
         try:
             package = json.loads((path / "package.json").read_text())
             scripts = package.get("scripts") if isinstance(package, dict) else None
-            if isinstance(scripts, dict) and all(name in scripts for name in ("queue", "verify:app")) and (path / "docs/prompt-verification.md").is_file():
+            if isinstance(scripts, dict) and "queue" in scripts and (path / "docs/prompt-verification.md").is_file():
                 valid.append(path.resolve())
         except (OSError, ValueError):
             continue
     valid = sorted(set(valid))
     if len(valid) != 1:
-        raise ValueError("Set METAMASK_E2E_ROOT to the intended toolkit checkout with queue/verify:app scripts and docs/prompt-verification.md; found " + str(len(valid)) + " valid roots.")
+        raise ValueError("Set METAMASK_E2E_ROOT to the intended toolkit checkout with a queue script and docs/prompt-verification.md; found " + str(len(valid)) + " valid roots.")
     return valid[0]
 
 

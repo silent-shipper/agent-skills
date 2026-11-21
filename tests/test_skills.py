@@ -112,7 +112,7 @@ class SkillInstallationTests(unittest.TestCase):
     def test_toolkit_resolution_is_host_local_and_explicit_selection_is_validated(self):
         def toolkit(path):
             (path / 'docs').mkdir(parents=True)
-            (path / 'package.json').write_text(json.dumps({'scripts': {'queue': 'node queue', 'verify:app': 'node verify'}}))
+            (path / 'package.json').write_text(json.dumps({'scripts': {'queue': 'node src/queue.mjs'}}))
             (path / 'docs/prompt-verification.md').write_text('Guide\n')
         laptop = self.home / 'Desktop/Projects/metamask-e2e'
         mini = self.home / 'Projects/metamask-e2e'
@@ -136,7 +136,7 @@ class SkillInstallationTests(unittest.TestCase):
             self.assertNotIn('create-verification', (self.home / '.codex/config.toml').read_text())
         toolkit = self.home / 'Projects/metamask-e2e'
         (toolkit / 'docs').mkdir(parents=True)
-        (toolkit / 'package.json').write_text(json.dumps({'scripts': {'queue': 'q', 'verify:app': 'v'}}))
+        (toolkit / 'package.json').write_text(json.dumps({'scripts': {'queue': 'q'}}))
         (toolkit / 'docs/prompt-verification.md').write_text('Guide\n')
         (toolkit / 'skills/create-verification').mkdir(parents=True)
         (toolkit / 'skills/create-verification/SKILL.md').write_text('---\nname: create-verification\ndescription: Verify.\n---\n')
