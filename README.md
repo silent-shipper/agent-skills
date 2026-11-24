@@ -228,7 +228,8 @@ python3 ~/.agents/skill-config/scripts/skills.py toolkit-root
 ```
 
 It validates the `queue` and `verify:app` package scripts and prompt guide. It
-checks the two existing Mac locations; an explicit `METAMASK_E2E_ROOT` selects a
+checks `tools/near-verify` in `~/Projects/defuse-frontend-monorepos` and
+`~/Desktop/Projects/defuse-frontend-monorepos`; an explicit `METAMASK_E2E_ROOT` selects a
 nonstandard checkout or resolves ambiguity. Nothing is cloned or copied. This
 proves local installation only; toolkit doctor and the live runner establish
 external login/account readiness.

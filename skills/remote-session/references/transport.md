@@ -23,12 +23,12 @@ to the current checkout. Preserve inherited model options and modes from
 ```sh
 python3 scripts/remote_session.py send \
   --ssh surge@100.108.123.39 \
-  --repo /Users/surge/Projects/metamask-e2e \
+  --repo /Users/surge/Projects/defuse-frontend-monorepos \
   --context /private/tmp/handoff.md \
   --title 'Continue benchmark work on Mac mini' \
   --provider codex --model gpt-6.1-sol --model-options '{"reasoningEffort":"high"}' \
   --runtime-mode auto --interaction-mode default \
-  --file evals/express.mjs --file src/verification/handover.mjs
+  --file tools/near-verify/evals/express.ts --file tools/near-verify/src/verification/handover.ts
 ```
 
 The helper discovers the running CLI from the PID in
@@ -39,7 +39,7 @@ feeding these tokens to `/mcp` produced HTTP 401 in the actual handoff.
 
 `send` requires fresh successful skill sync receipts on both hosts and compares
 complete skill source hashes before launching. For a task that depends on
-metamask-e2e, add `--toolkit-root /source/task/toolkit` and
+near-verify, add `--toolkit-root /source/task/toolkit` and
 `--remote-toolkit-root /target/task/toolkit`. Stage a differing task toolkit using
 its source snapshot first. The gate compares the existing verifier's source digest;
 it does not copy credentials, overwrite toolkits, or establish runner login.

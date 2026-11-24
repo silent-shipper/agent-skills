@@ -58,7 +58,7 @@ def reference_errors(skills):
 def toolkit_root(configured=None):
     configured = os.environ.get("METAMASK_E2E_ROOT") if configured is None else configured
     candidates = [Path(configured).expanduser()] if configured else [
-        HOME_DIR / "Desktop/Projects/metamask-e2e", HOME_DIR / "Projects/metamask-e2e"]
+        HOME_DIR / projects / "defuse-frontend-monorepos/tools/near-verify" for projects in ("Desktop/Projects", "Projects")]
     valid = []
     for path in candidates:
         try:
@@ -79,9 +79,9 @@ def toolkit_identity():
     # Use the verifier's source owner so this receipt has the same digest as jobs.
     script = "const {repository}=await import(process.argv[1]); const s=await repository(process.argv[2]); console.log(JSON.stringify({root:s.root,revision:s.revision,digest:s.digest}));"
     data = json.loads(run("node", "--input-type=module", "-e", script,
-                          (root / "src/verification/source.mjs").as_uri(), str(root)))
+                          (root / "src/verification/source.ts").as_uri(), str(root)))
     data["dirty_files"] = ([] if (root / ".toolkit-snapshot.json").is_file() else
-                           run("git", "-C", str(root), "status", "--porcelain", quiet=True).splitlines())
+                           run("git", "-C", str(root), "status", "--porcelain", "--", ".", quiet=True).splitlines())
     data["selection"] = "explicit" if os.environ.get("METAMASK_E2E_ROOT") else "default"
     if data["dirty_files"] and data["selection"] == "default":
         raise ValueError("Default toolkit has unpublished edits. Preserve them in a task checkout; select the intended task toolkit explicitly with METAMASK_E2E_ROOT. " + str(root))
@@ -355,7 +355,7 @@ def check(installation_only=False, require_sync=False):
     status = "FAIL" if errors else "PASS" if installation_only or health["status"] == "ready" else "BLOCKED"
     print(json.dumps({"status": status, "installation_status": "FAIL" if errors else "PASS", "sync": health, "skills_checked": len(skills),
                       "links_checked": len(managed_paths(skills)), "errors": errors, **current,
-                      "toolkits": {"metamask-e2e": toolkit}, "last_sync": last_sync,
+                      "toolkits": {"near-verify": toolkit}, "last_sync": last_sync,
                       "auto_sync_installed": (HOME_DIR / "Library/LaunchAgents" / (LABEL + ".plist")).is_file()}, indent=2))
     if errors or require_sync and health["status"] != "ready":
         raise SystemExit(1)

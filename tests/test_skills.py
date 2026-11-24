@@ -114,8 +114,8 @@ class SkillInstallationTests(unittest.TestCase):
             (path / 'docs').mkdir(parents=True)
             (path / 'package.json').write_text(json.dumps({'scripts': {'queue': 'node src/queue.mjs'}}))
             (path / 'docs/prompt-verification.md').write_text('Guide\n')
-        laptop = self.home / 'Desktop/Projects/metamask-e2e'
-        mini = self.home / 'Projects/metamask-e2e'
+        laptop = self.home / 'Desktop/Projects/defuse-frontend-monorepos/tools/near-verify'
+        mini = self.home / 'Projects/defuse-frontend-monorepos/tools/near-verify'
         with patch.dict(os.environ, {}, clear=True):
             toolkit(laptop)
             self.assertEqual(skills.toolkit_root(), laptop.resolve())
@@ -134,7 +134,7 @@ class SkillInstallationTests(unittest.TestCase):
             skills.install()
             self.assertFalse(link.exists())
             self.assertNotIn('create-verification', (self.home / '.codex/config.toml').read_text())
-        toolkit = self.home / 'Projects/metamask-e2e'
+        toolkit = self.home / 'Projects/defuse-frontend-monorepos/tools/near-verify'
         (toolkit / 'docs').mkdir(parents=True)
         (toolkit / 'package.json').write_text(json.dumps({'scripts': {'queue': 'q'}}))
         (toolkit / 'docs/prompt-verification.md').write_text('Guide\n')
