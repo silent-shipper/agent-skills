@@ -253,3 +253,23 @@ worktrees and publish tested shared changes through that repository's workflow.
 The toolkit already freezes and binds source for queued jobs; retain that owner.
 No background job updates active toolkit or app worktrees. This repository's sync
 job distributes skills only, not arbitrary repository edits or credentials.
+
+## Heavy work queue and idle simulators
+
+`install` links `~/.local/bin/heavy` (`scripts/heavy.py`), this Mac's queue for heavy work outside
+defuse-frontend-monorepos, which keeps using near-verify's queue:
+
+```sh
+heavy -- bun run build        # waits for a slot and a calm Mac, then runs here with the command's exit code
+heavy --browser -- ./check.sh # force the one-at-a-time lane
+heavy status
+```
+
+Browser, simulator and shell-script work runs one at a time; builds, full suites and typechecks run two at a time
+(Task Spooler sockets in `~/.local/state/heavy`). A job waits while load per CPU is above 1.25 or free memory is below
+a quarter of RAM, for at most `HEAVY_MAX_WAIT_SECONDS` (300). `agent-guard.py` denies unqueued builds, full suites,
+typechecks, Playwright runs, `node` scripts that start a browser, and local shell scripts that run any of them.
+
+`install` also loads `com.surge.heavy.idle-sim`, which runs `heavy idle-sim` every five minutes. It shuts down every
+booted simulator once 30 minutes pass with no `heavy` browser job, near-verify worker, Xcode, simctl, Maestro, Detox,
+Appium or Expo iOS process, and Simulator.app not in front. Log: `~/Library/Logs/heavy/idle-sim.log`.

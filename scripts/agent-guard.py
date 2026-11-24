@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Claude Code PreToolUse guard for PR evidence, push targets, commit identity, merge checks, whole-stack merges and the shared test queue."""
+"""Claude Code PreToolUse guard for PR evidence, push targets, commit identity, merge checks, whole-stack merges and the
+test queues: near-verify's in defuse-frontend-monorepos, `heavy` everywhere else."""
 import json
 import os
 import re
@@ -8,10 +9,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import heavy  # noqa: E402
+
 PLACEHOLDER = re.compile(r"<[a-z][^<>\n]*>")
 TOOLKIT = '"$(python3 ~/.agents/skill-config/scripts/skills.py toolkit-root)"'
 QUEUE = f"npm --prefix {TOOLKIT} run queue -- run -- "
 WORK_QUEUE = f"npm --prefix {TOOLKIT} run queue -- run --lane work -- "
+HEAVY = "heavy -- "
+QUEUED = ("queue", "verify:app", "testq", "testq.mjs", "heavy")
+SCRIPT_DEPTH = 2
 MONOREPO = "defuse-protocol/defuse-frontend-monorepos"
 HEAVY_SCRIPTS = {"test", "build", "typecheck"}
 TEST_TOOLS = {"vitest", "jest"}
@@ -191,7 +198,7 @@ def heavy_check(words):
     if "--list" in words or {"--help", "--version", "-v"} & set(words):
         return None
     for index, word in enumerate(words):
-        if os.path.basename(word) in ("queue", "verify:app", "testq", "testq.mjs"):
+        if os.path.basename(word) in QUEUED:
             return None
         if os.path.basename(word) in SHELLS and "-c" in words[index:-1]:
             inner = words[words.index("-c", index) + 1]
@@ -216,16 +223,16 @@ def heavy_check(words):
         script = positional[1] if positional[:1] == ["run"] and len(positional) > 1 else (positional or [""])[0]
         if script not in HEAVY_SCRIPTS:
             return None
-        heavy = script != "test" or not focused
+        is_heavy = script != "test" or not focused
     elif tool in TEST_TOOLS:
-        heavy = not focused
+        is_heavy = not focused
     elif tool == "tsc":
-        heavy = True
+        is_heavy = True
     elif tool == "next":
-        heavy = args[:1] == ["build"]
+        is_heavy = args[:1] == ["build"]
     else:
         return None
-    return (words[:start], words[start:]) if heavy else None
+    return (words[:start], words[start:]) if is_heavy else None
 
 
 def browser_test(words):
@@ -234,7 +241,7 @@ def browser_test(words):
         return None
     for index, word in enumerate(words):
         name = os.path.basename(word)
-        if name in ("queue", "verify:app", "testq", "testq.mjs"):
+        if name in QUEUED:
             return None
         if name in SHELLS and "-c" in words[index:-1]:
             inner = words[words.index("-c", index) + 1]
@@ -243,8 +250,84 @@ def browser_test(words):
         playwright = PLAYWRIGHT.search(word) and words[index + 1:index + 2] == ["test"] and launched
         script = re.search(r"(?:^|#)test:e2e", word) and SCRIPT_RUNNERS & {os.path.basename(w) for w in words[:index]}
         if playwright or script:
-            end = next((i for i, w in enumerate(words) if REDIRECT.match(w)), len(words))
-            return shlex.join(words[:end])
+            return until_redirect(words)
+    return None
+
+
+def until_redirect(words):
+    return shlex.join(words[:next((i for i, w in enumerate(words) if REDIRECT.match(w)), len(words))])
+
+
+def command_words(words):
+    """The words from the program on: leading assignments and nohup/time/exec/env/timeout N dropped."""
+    while words and (re.match(r"^\w+=", words[0]) or os.path.basename(words[0]) in {"nohup", "time", "exec", "env"}):
+        words = words[1:]
+    if words[:1] == ["timeout"] and len(words) > 2:
+        return command_words(words[2:])
+    return words
+
+
+def browser_script(words, here):
+    """A `node x.mjs`-style run of a script that starts a browser itself."""
+    words = command_words(words)
+    if not words or os.path.basename(words[0]) not in heavy.SCRIPT_HOSTS:
+        return None
+    script = heavy.script_file(words, here)
+    return until_redirect(words) if script and heavy.loads_browser(script) else None
+
+
+def script_work(words, here, depth=0):
+    """The first unqueued heavy or browser command inside a local shell script this segment runs."""
+    words = command_words(words)
+    if depth >= SCRIPT_DEPTH or any(os.path.basename(w) in QUEUED for w in words):
+        return None
+    script = heavy.script_file(words, here)
+    if not script or not heavy.is_shell_script(script):
+        return None
+    text = "\n".join(line for line in heavy.read_script(script).splitlines() if not line.lstrip().startswith("#"))
+    for inner in simple_commands(text):
+        for start in range(len(inner)):
+            rest = inner[start:]
+            run = heavy_check(rest)
+            found = (browser_test(rest) or (run and shlex.join(run[1])) or browser_script(rest, here)
+                     or script_work(rest, here, depth + 1))
+            if found:
+                return found
+    return None
+
+
+def queue_decision(command, cwd):
+    """Heavy or browser work that skips its queue: near-verify's in defuse-frontend-monorepos, `heavy` everywhere else."""
+    background = " It waits for a free slot, so run it in the background when it may take over 10 minutes."
+    here = cwd
+    for words in segments(HEREDOC.sub(r"\1\4", command)):
+        if words[:1] == ["cd"] and len(words) > 1:
+            here = (here / os.path.expanduser(words[1])).resolve()
+            continue
+        test = browser_test(words) or browser_script(words, here)
+        run = heavy_check(words)
+        script = script_work(words, here)
+        if not (test or run or script):
+            continue
+        team = remote(here) == MONOREPO
+        if test:
+            return ("deny", "Browser tests share one queue so this Mac runs one at a time; an unqueued run overloaded "
+                            f"it before. Run it through the queue instead: {QUEUE if team else HEAVY}{test}"
+                            + ("" if team else background))
+        if run:
+            assignments, run = run
+            prefix = shlex.join(assignments) + " " if assignments else ""
+            if team:
+                return ("deny", "Full unit suites, builds and typechecks run in the queue's work lane (two at a time) so "
+                                "they cannot overload this Mac beside a browser run; a direct full suite did on 2026-10-26. "
+                                f"Name the affected test files to run them directly, or queue it: {prefix}{WORK_QUEUE}"
+                                f"{shlex.join(run)}")
+            return ("deny", "Full test suites, builds and typechecks run through this Mac's queue (two at a time, once "
+                            "load settles); unqueued builds beside browser runs overloaded it on 2026-11-24. Name the "
+                            f"affected test files to run them directly, or queue it: {prefix}{HEAVY}{shlex.join(run)}."
+                            + background)
+        return ("deny", f"This script runs `{script}` outside a queue; an unqueued script overloaded this Mac on "
+                        f"2026-11-24. Queue the whole script: {HEAVY}{until_redirect(command_words(words))}." + background)
     return None
 
 
@@ -470,23 +553,9 @@ def decide(payload):
 
 
 def shell_decision(command, cwd, project):
-    for words in segments(HEREDOC.sub(r"\1\4", command)):
-        test = browser_test(words)
-        if test:
-            return ("deny", "Browser tests share one queue so this Mac runs one at a time; an unqueued run overloaded "
-                            f"it before. Run it through the queue instead: {QUEUE}{test}")
-    here = cwd
-    for words in segments(HEREDOC.sub(r"\1\4", command)):
-        if words[:1] == ["cd"] and len(words) > 1:
-            here = (here / os.path.expanduser(words[1])).resolve()
-            continue
-        heavy = heavy_check(words)
-        if heavy and remote(here) == MONOREPO:
-            assignments, run = heavy
-            prefix = shlex.join(assignments) + " " if assignments else ""
-            return ("deny", "Full unit suites, builds and typechecks run in the queue's work lane (two at a time) so they "
-                            "cannot overload this Mac beside a browser run; a direct full suite did on 2026-10-26. Name the "
-                            f"affected test files to run them directly, or queue it: {prefix}{WORK_QUEUE}{shlex.join(run)}")
+    queued = queue_decision(command, cwd)
+    if queued:
+        return queued
     here = cwd
     for words in segments(command):
         if not words:

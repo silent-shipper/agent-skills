@@ -18,6 +18,8 @@ from urllib.parse import unquote, urlsplit
 REPO = Path(__file__).resolve().parent.parent
 HOME_DIR = Path.home().resolve()
 LABEL = "com.silent-shipper.agent-skills"
+IDLE_SIM_LABEL = "com.surge.heavy.idle-sim"
+LAUNCH_PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 ROOTS = (".agents/skills", ".codex/skills", ".claude/skills")
 
 
@@ -242,6 +244,7 @@ def managed_paths(skills):
         paths[HOME_DIR / path] = REPO / "surge-defaults.md"
     paths[HOME_DIR / ".agents/check-skills.py"] = REPO / "scripts/check-skills.py"
     paths[HOME_DIR / ".agents/agent-guard.py"] = REPO / "scripts/agent-guard.py"
+    paths[HOME_DIR / ".local/bin/heavy"] = REPO / "scripts/heavy.py"
     if (HOME_DIR / ".claude-alt").is_dir():
         paths[HOME_DIR / ".claude-alt/CLAUDE.md"] = REPO / "surge-defaults.md"
     return paths
@@ -337,6 +340,7 @@ def install(synced=False):
         temporary.chmod(0o600)
         temporary.replace(config)
     configure_claude()
+    idle_sim_agent()
     try:
         check(installation_only=True)
     except SystemExit:
@@ -347,12 +351,48 @@ def install(synced=False):
         print("Backups:", directory)
 
 
+def launchd_domain():
+    gui = "gui/" + str(os.getuid())
+    return gui if subprocess.run(["launchctl", "print", gui], stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL).returncode == 0 else "user/" + str(os.getuid())
+
+
+def idle_sim_path():
+    return HOME_DIR / "Library/LaunchAgents" / (IDLE_SIM_LABEL + ".plist")
+
+
+def idle_sim_agent():
+    """Run `heavy idle-sim` every five minutes, so booted simulators nothing has used for 30 minutes shut down.
+    Candidate homes get the file but never load it into launchd."""
+    logs = HOME_DIR / "Library/Logs/heavy"
+    data = {"Label": IDLE_SIM_LABEL, "ProgramArguments": ["/usr/bin/python3", str(REPO / "scripts/heavy.py"), "idle-sim"],
+            "EnvironmentVariables": {"PATH": LAUNCH_PATH}, "StartInterval": 300, "RunAtLoad": True,
+            "StandardOutPath": str(logs / "idle-sim.log"), "StandardErrorPath": str(logs / "idle-sim.log")}
+    path = idle_sim_path()
+    changed = not path.exists() or plistlib.loads(path.read_bytes()) != data
+    if changed:
+        logs.mkdir(parents=True, exist_ok=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(plistlib.dumps(data))
+    if HOME_DIR.resolve() != Path(pwd.getpwuid(os.getuid()).pw_dir).resolve():
+        return
+    domain = launchd_domain()
+    loaded = subprocess.run(["launchctl", "print", domain + "/" + IDLE_SIM_LABEL], stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL).returncode == 0
+    if loaded and changed:
+        run("launchctl", "bootout", domain + "/" + IDLE_SIM_LABEL)
+    if changed or not loaded:
+        run("launchctl", "bootstrap", domain, str(path))
+
+
 def check(installation_only=False, require_sync=False):
     skills = manifest()
     errors = reference_errors(skills) + ["Retired skill still linked: " + str(path) for path in retired_links(skills)]
     for path, target in managed_paths(skills).items():
         if not path.is_symlink() or path.resolve() != target or not target.exists():
             errors.append("Invalid link: " + str(path))
+    if not idle_sim_path().is_file():
+        errors.append("Missing launch agent: " + str(idle_sim_path()))
     config = HOME_DIR / ".codex/config.toml"
     entries = list(configured(config.read_text() if config.exists() else ""))
     for skill in skills:
@@ -403,15 +443,12 @@ def auto_sync():
     path = HOME_DIR / "Library/LaunchAgents" / (LABEL + ".plist")
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {"Label": LABEL, "ProgramArguments": ["/usr/bin/python3", str(REPO / "scripts/skills.py"), "sync"],
-            "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
-            "StartInterval": 300, "RunAtLoad": True,
+            "EnvironmentVariables": {"PATH": LAUNCH_PATH}, "StartInterval": 300, "RunAtLoad": True,
             "StandardOutPath": str(directory / "sync.log"), "StandardErrorPath": str(directory / "sync-error.log")}
     if path.exists() and plistlib.loads(path.read_bytes()) != data:
         raise SystemExit("A different launch agent already exists: " + str(path))
     path.write_bytes(plistlib.dumps(data))
-    gui = "gui/" + str(os.getuid())
-    domain = gui if subprocess.run(["launchctl", "print", gui], stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL).returncode == 0 else "user/" + str(os.getuid())
+    domain = launchd_domain()
     if subprocess.run(["launchctl", "print", domain + "/" + LABEL], stdout=subprocess.DEVNULL,
                       stderr=subprocess.DEVNULL).returncode:
         run("launchctl", "bootstrap", domain, str(path))

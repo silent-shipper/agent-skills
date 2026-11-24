@@ -290,7 +290,55 @@ class AgentGuardTests(unittest.TestCase):
                         guard.WORK_QUEUE + "bun run test --run",
                         "cat > /tmp/notes.md <<'EOF'\nbun run test --run\nEOF\ngit status"):
             self.assertIsNone(self.decide(command, self.app), command)
-        self.assertIsNone(self.decide(FULL_SUITE, self.e2e))
+
+    def test_heavy_work_outside_the_monorepo_goes_through_heavy(self):
+        result = self.decide(FULL_SUITE, self.e2e)
+        self.assertEqual(result[0], "deny")
+        self.assertIn("HEADLESS=true heavy -- bun run test --run.", result[1])
+        self.assertIn("in the background", result[1])
+        self.assertIn("heavy -- bunx playwright test e2e", self.decide("bunx playwright test e2e", self.e2e)[1])
+        for command in ("bun run build", "next build", "npx tsc --noEmit", "bunx vitest run", "cd /tmp && bun run typecheck"):
+            self.assertEqual((self.decide(command, self.e2e) or ("allow",))[0], "deny", command)
+        for command in ("heavy -- bun run build", "heavy --browser -- bunx playwright test", "heavy status",
+                        "bunx vitest run src/features/swap/machine.test.ts", "bun run lint", "bun install"):
+            self.assertIsNone(self.decide(command, self.e2e), command)
+
+    # The script that overloaded the Mac mini on 2026-11-24: typechecks, lint and a Next build behind a step() helper.
+    CHECK_SCRIPT = """#!/bin/bash
+set -u
+# bun run build in a comment is not a command
+step() {
+  local name=$1
+  shift
+  "$@" > "$LOG/$name.log" 2>&1
+}
+step l1-typecheck bun run typecheck
+step l1-unit ./node_modules/.bin/vitest run src/config/csp.test.ts
+for attempt in 1 2; do
+  if bun run build > "$LOG/l2-build.log" 2>&1; then built=0; break; fi
+done
+"""
+
+    def test_scripts_that_run_heavy_work_are_queued_whole(self):
+        script = self.e2e / "check.sh"
+        script.write_text(self.CHECK_SCRIPT)
+        script.chmod(0o755)
+        (self.e2e / "nested.sh").write_text("#!/bin/sh\necho start\n./check.sh\n")
+        (self.e2e / "check-node.mjs").write_text("import {chromium} from 'playwright'\n")
+        (self.e2e / "browser.sh").write_text("#!/bin/sh\nnode check-node.mjs\n")
+        for command, shown in (("./check.sh > /tmp/check.log 2>&1", "heavy -- ./check.sh."),
+                               ("bash check.sh", "heavy -- bash check.sh."),
+                               ("nohup ./nested.sh", "heavy -- ./nested.sh."),
+                               (f"cd {self.e2e} && sh browser.sh", "heavy -- sh browser.sh.")):
+            result = self.decide(command, self.e2e)
+            self.assertEqual(result[0], "deny", command)
+            self.assertIn(shown, result[1])
+        self.assertIn("runs `bun run typecheck`", self.decide("./check.sh", self.e2e)[1])
+        self.assertIn("heavy -- node check-node.mjs", self.decide("node check-node.mjs", self.e2e)[1])
+        quiet = self.e2e / "quiet.sh"
+        quiet.write_text("#!/bin/sh\n# bun run build later\necho 'bun run build'\nbunx vitest run a.test.ts\n")
+        for command in ("./quiet.sh", "heavy -- ./check.sh", "cat check.sh", "node -e 'require(\"playwright\")'"):
+            self.assertIsNone(self.decide(command, self.e2e), command)
 
 
     def test_unqueued_browser_tests_are_denied(self):

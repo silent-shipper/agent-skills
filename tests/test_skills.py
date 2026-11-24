@@ -211,6 +211,27 @@ class SkillInstallationTests(unittest.TestCase):
         self.assertEqual(plistlib.loads(config.read_bytes())['StartInterval'], 300)
         command.assert_called_once_with('launchctl', 'bootstrap', 'user/501', str(config))
 
+    def test_install_links_heavy_and_writes_the_idle_simulator_agent_without_loading_it(self):
+        import plistlib
+        with patch.object(skills, 'launchd_domain', side_effect=AssertionError('Candidate homes must not load agents')):
+            skills.install()
+            skills.install()
+        self.assertEqual((self.home / '.local/bin/heavy').resolve(), skills.REPO / 'scripts/heavy.py')
+        agent = plistlib.loads(skills.idle_sim_path().read_bytes())
+        self.assertEqual(agent['ProgramArguments'][1:], [str(skills.REPO / 'scripts/heavy.py'), 'idle-sim'])
+        self.assertEqual(agent['StartInterval'], 300)
+
+    def test_idle_simulator_agent_reloads_only_when_it_changes(self):
+        real_home = skills.pwd.struct_passwd(('surge', '', 501, 20, '', str(self.home), '/bin/zsh'))
+        loaded = subprocess.CompletedProcess([], 0)
+        with patch.object(skills.pwd, 'getpwuid', return_value=real_home), patch.object(skills.os, 'getuid', return_value=501), \
+             patch.object(skills.subprocess, 'run', return_value=loaded), patch.object(skills, 'run') as command:
+            skills.idle_sim_agent()
+            skills.idle_sim_agent()
+        target = 'gui/501/' + skills.IDLE_SIM_LABEL
+        self.assertEqual([c.args for c in command.call_args_list],
+                         [('launchctl', 'bootout', target), ('launchctl', 'bootstrap', 'gui/501', str(skills.idle_sim_path()))])
+
     def test_auto_sync_bootstrap_does_not_hold_the_install_lock(self):
         with patch.object(sys, 'argv', ['skills.py', 'enable-auto-sync']), \
              patch.object(skills, 'auto_sync') as enable, \
@@ -256,6 +277,7 @@ class SkillInstallationTests(unittest.TestCase):
         shutil.copy2(skills.REPO / 'scripts/skills.py', origin / 'scripts/skills.py')
         shutil.copy2(skills.REPO / 'scripts/check-skills.py', origin / 'scripts/check-skills.py')
         shutil.copy2(skills.REPO / 'scripts/agent-guard.py', origin / 'scripts/agent-guard.py')
+        shutil.copy2(skills.REPO / 'scripts/heavy.py', origin / 'scripts/heavy.py')
         shutil.copytree(skills.REPO / 'skills/architect', origin / 'skills/architect')
         (origin / 'manifest.json').write_text(json.dumps({'version': 1, 'skills': [{'name': 'architect', 'codex_enabled': True}]}))
         (origin / 'surge-defaults.md').write_text('Shared defaults\n')
