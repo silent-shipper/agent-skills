@@ -269,20 +269,41 @@ def skill_config(text, skills, retired=()):
     return text.rstrip() + "\n\n" + additions
 
 
-def register_guard():
+GUARD_MATCHER = "Bash|mcp__t3-code__pull_request_merge"
+BUNDLED_SKILL_OVERRIDES = {"ship-local": "user-invocable-only", "steward": "user-invocable-only"}
+
+
+def configure_claude():
+    """Run agent-guard on shell commands and T3 merges, and keep the bundled /ship and /steward, which never merge
+    and reserve the name `ship`, typable but out of Claude's skill list so `ship-it` handles shipping."""
     command = str(HOME_DIR / ".agents/agent-guard.py")
     for home in (".claude", ".claude-alt"):
         if home == ".claude-alt" and not (HOME_DIR / home).is_dir():
             continue
         path = HOME_DIR / home / "settings.json"
         settings = json.loads(path.read_text()) if path.exists() else {}
+        before = json.dumps(settings, sort_keys=True)
         hooks = settings.setdefault("hooks", {}).setdefault("PreToolUse", [])
-        if any(h.get("command") == command for entry in hooks for h in entry.get("hooks", [])):
+        ours = [entry for entry in hooks if any(h.get("command") == command for h in entry.get("hooks", []))]
+        if len(ours) == 1 and all(h.get("command") == command for h in ours[0]["hooks"]):
+            ours[0]["matcher"] = GUARD_MATCHER
+        else:
+            moved = [h for entry in ours for h in entry["hooks"] if h.get("command") == command]
+            for entry in ours:
+                entry["hooks"] = [h for h in entry["hooks"] if h.get("command") != command]
+            hooks[:] = [entry for entry in hooks if entry.get("hooks") or not any(entry is mine for mine in ours)]
+            hooks.append({"matcher": GUARD_MATCHER, "hooks": moved[:1] or [{"type": "command", "command": command}]})
+        overrides = settings.setdefault("skillOverrides", {})
+        for name, state in BUNDLED_SKILL_OVERRIDES.items():
+            overrides.setdefault(name, state)
+        if json.dumps(settings, sort_keys=True) == before:
             continue
-        hooks.append({"matcher": "Bash", "hooks": [{"type": "command", "command": command}]})
+        mode = path.stat().st_mode & 0o777 if path.exists() else 0o600
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_name("settings.json.skill-config-tmp")
-        temporary.write_text(json.dumps(settings, indent=2) + "\n")
+        with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as handle:
+            os.fchmod(handle.fileno(), mode)
+            handle.write(json.dumps(settings, indent=2) + "\n")
         temporary.replace(path)
 
 
@@ -315,7 +336,7 @@ def install(synced=False):
         temporary.write_text(new)
         temporary.chmod(0o600)
         temporary.replace(config)
-    register_guard()
+    configure_claude()
     try:
         check(installation_only=True)
     except SystemExit:

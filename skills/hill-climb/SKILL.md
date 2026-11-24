@@ -97,7 +97,7 @@ checkout, climb in a separate worktree.
 - A reached bar is supporting evidence, not verification. Defuse UI or flow
   goals finish with `create-verification` in a real browser; report the score
   and the browser result separately.
-- Climb commits stay local. Pushing or opening a PR follows `ship` and needs
+- Climb commits stay local. Pushing or opening a PR follows `ship-it` and needs
   the user's shipping authorization.
 
 ## 0. Resume or reuse
@@ -202,6 +202,7 @@ Examples, not a closed list. Recipes are in `references/checks.md`:
 | Audit, stabilize, "make X work" | Failing tests, one per finding. Add a test for each new finding and `relock` |
 | Speed or size | A count of the work behind the time |
 | Several goals at once | Progress toward the worst bar |
+| A UI or app experience | Failing browser tests, one per thing the user must be able to do (create, edit in place, delete, move, use on mobile), plus `judge.py` for the look |
 | Look, feel, writing, API shape | `judge.py` with a rubric and good examples |
 
 Use what the repo already has. `--score '<regex>'` reads the score from

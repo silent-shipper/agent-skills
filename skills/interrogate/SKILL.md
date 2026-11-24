@@ -23,7 +23,7 @@ Track Scope, Review, Synthesize, and Verdict in the task plan.
 
 Read [reviewer-prompt.md](references/reviewer-prompt.md), [rubric.md](references/rubric.md), and [code-quality.md](references/code-quality.md). Use two independent read-only reviewers for a bounded change and three for broad or risky changes; honor a requested count. Add reviewers only for a concrete coverage need. Every reviewer receives the same intent, artifact paths or diff, relevant context, rubric, and output contract. Instruct reviewers not to edit files.
 
-Use inherited models by default. Use model overrides only when the user or governing instructions explicitly request them. If several permitted model families are available, diversity can improve blind-spot coverage; otherwise independent contexts still provide useful variance. Do not invent personas merely to force disagreement.
+Make one reviewer a provider family other than your own whenever one is available: in T3, pick it from `orchestrator_capabilities` (a Codex Astra model under Claude, a Claude model under Codex) and run it through `delegate_task` at high reasoning. The other reviewers inherit the parent model. Honor models the user names. Without a second family, independent contexts still add variance. Do not invent personas merely to force disagreement.
 
 ## Synthesize
 

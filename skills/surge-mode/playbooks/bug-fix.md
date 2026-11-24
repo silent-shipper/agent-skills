@@ -24,7 +24,7 @@ hypothesis motivated. The smallest change the evidence justifies ships.
    behavior, not implementation**), and show it failing without the fix and
    passing with it. Skip with a reason when the test would be expensive or
    unclear.
-6. Ship with `ship` when authorized; otherwise stop at the local checkpoint.
+6. Ship with `ship-it` when authorized; otherwise stop at the local checkpoint.
 
 **Reply:** what was broken, the root cause, the fix, and the failing-then-passing
 proof.

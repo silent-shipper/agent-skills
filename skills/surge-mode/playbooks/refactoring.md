@@ -25,7 +25,7 @@ structural change first against the pinned contract.
    `create-verification` for supported Defuse work. For
    larger reshapes, diff old against new outputs or replay a recorded baseline.
 7. Order commits: subtraction, then reshape, then follow-on cleanup.
-8. Ship with `ship` when authorized; otherwise stop at the local checkpoint.
+8. Ship with `ship-it` when authorized; otherwise stop at the local checkpoint.
 
 **Reply:** what structure changed, the pin it held against, the equivalence
 proof, what got simpler for the next reader, and anything reverted.

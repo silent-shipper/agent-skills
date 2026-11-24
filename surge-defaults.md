@@ -4,7 +4,8 @@ Apply these preferences to coding, design and review work. Follow the user's
 requested scope and checkpoint; project guidance supplies domain rules.
 
 - Establish the intended behavior and existing implementation before choosing
-  a solution. Prefer existing owners, data and patterns. Compare against the
+  a solution, including open PRs that already do the work; reuse or stack on
+  them. Prefer existing owners, data and patterns. Compare against the
   baseline so introduced regressions, existing issues and optional improvements
   remain distinct.
 - Deliver the simplest complete solution. Justify new files, abstractions,
@@ -48,6 +49,15 @@ requested scope and checkpoint; project guidance supplies domain rules.
   data) in a file and link it; expand only when the user asks for detail.
   A requested list, board or agenda keeps every in-scope item; shorten each
   item instead of dropping items to fit the cap.
+- Write so the user gets it on first read. Lead with the gist in their terms,
+  the one cause and what we do about it, and name each item by the problem it
+  solves for users or the team, not by internal labels, codenames or status
+  shorthand. A question about one PR in a stack covers the whole stack. Link
+  every PR, stack (`https://github.com/<owner>/<repo>/stack/<n>`), file and
+  page you mention. The user often reads from another device: serve anything
+  running on this Mac over Tailscale (`tailscale serve --bg --https=<port>
+  http://127.0.0.1:<port>`), check it loads at its `https://…ts.net:<port>`
+  address, and never hand over a localhost link.
 - Approve a PR with an empty body (`gh pr review N --approve`); anything the
   author needs goes in a separate unslop comment the user has seen first.
 - Lead with the result or decision. For a plan, implementation or PR review,

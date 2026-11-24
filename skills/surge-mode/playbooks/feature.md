@@ -20,7 +20,7 @@
    Inconclusive or wrong-surface is not a pass.
 6. Keep commits small and ordered, each landable and green.
 7. If the design is contested, run `interrogate` before shipping.
-8. Ship with `ship` when authorized; otherwise stop at the local checkpoint.
+8. Ship with `ship-it` when authorized; otherwise stop at the local checkpoint.
 
 **Reply:** what you built, what you chose and why, the throughput checkpoint and
 open decisions. Use a table for design alternatives.

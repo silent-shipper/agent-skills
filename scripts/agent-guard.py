@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Code PreToolUse guard for PR evidence, push targets, commit identity, merge checks and the shared test queue."""
+"""Claude Code PreToolUse guard for PR evidence, push targets, commit identity, merge checks, whole-stack merges and the shared test queue."""
 import json
 import os
 import re
@@ -33,6 +33,10 @@ LOCAL_EMAIL = re.compile(r"@(?:localhost|[^@\s]+\.(?:local|localdomain))$", re.I
 OUTGOING_LIMIT = 200
 MERGE_VALUE_OPTIONS = {"-A", "--author-email", "-b", "--body", "-F", "--body-file", "--match-head-commit",
                        "-R", "--repo", "-t", "--subject"}
+T3_MERGE = "mcp__t3-code__pull_request_merge"
+PREFIX_WORDS = {"export", "declare", "local", "readonly", "typeset", "env", "command", "exec", "nohup", "time",
+                "then", "do", "else", "!", "{"}
+MERGE_ASYNC = re.compile(r"(?:^|/)repos/([\w.-]+/[\w.-]+)/pulls/(\d+)/merge-async/?$")
 
 
 def remote(path):
@@ -338,12 +342,134 @@ def unfinished_checks(words, here):
     return "; ".join(f"{labels.get(bucket, bucket)}: {', '.join(names)}" for bucket, names in unfinished.items()) or None
 
 
+def gh_json(args, cwd):
+    """Parsed output of a read-only gh call, or None when gh cannot answer."""
+    try:
+        result = subprocess.run(["gh", *args], cwd=cwd, capture_output=True, text=True, timeout=CHECKS_TIMEOUT)
+        return json.loads(result.stdout) if result.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+def stack_merge_problem(repo, number, whole_stack, cwd):
+    """("deny", why) when merging PR `number` would merge part of its GitHub stack, ("ask", why) when gh cannot tell,
+    or None when the merge covers no stack or all of one."""
+    pr = gh_json(["api", f"repos/{repo}/pulls/{number}"], cwd)
+    if not isinstance(pr, dict):
+        return ("ask", f"`gh api repos/{repo}/pulls/{number}` failed, so whether this merge splits a stack is unknown. "
+                       "Retry, or confirm the user approved this merge.")
+    stack = pr.get("stack")
+    if not isinstance(stack, dict) or not stack.get("number"):
+        return None
+    listing = gh_json(["api", f"repos/{repo}/stacks/{stack['number']}"], cwd)
+    entries = listing.get("pull_requests") if isinstance(listing, dict) else None
+    layers = [layer for layer in entries if isinstance(layer, dict) and layer.get("state") == "open"] if isinstance(entries, list) else []
+    top = layers[-1].get("number") if layers else None
+    sha = (layers[-1].get("head") or {}).get("sha") if layers and isinstance(layers[-1].get("head"), dict) else None
+    position, size = stack.get("position"), stack.get("size")
+    known = isinstance(position, int) and isinstance(size, int)
+    if whole_stack:
+        if not top and not known:
+            return ("ask", f"#{number} is in stack #{stack['number']}, but gh could not show which layer is its top. "
+                           "Retry, or confirm the user approved this merge.")
+        if (str(top) == str(number)) if top else position == size:
+            return None
+    if top and sha:
+        how = (f"pull_request_merge with number: {top}, stack: true, method: \"squash\", expectedHeadSha: \"{sha}\" "
+               f"(without T3: `gh api -X PUT repos/{repo}/pulls/{top}/merge-async -f merge_method=squash -f sha={sha}`)")
+    else:
+        how = (f"pull_request_merge with stack: true on its top PR (`gh api repos/{repo}/stacks/{stack['number']}` "
+               "lists the layers bottom first)")
+    where = f"layer {position} of {size} in" if known else "a layer of"
+    return ("deny", f"#{number} is {where} stack #{stack['number']}, and the user merges stacks as one unit, never a "
+                    "layer alone. Once every layer is approved on its live head and its checks are settled, merge the "
+                    f"whole stack from its top: {how}.")
+
+
+def merge_decision(repo, number, whole_stack, here, project):
+    """A merge that splits a GitHub stack is denied; one in another repository than the session's needs the user."""
+    problem = stack_merge_problem(repo, number, whole_stack, here) if repo and number else None
+    if problem and problem[0] == "deny":
+        return problem
+    home = remote(project)
+    if repo and home and repo.lower() != home:
+        return ("ask", f"This session's repo is {home}, but this merge targets {repo}. "
+                       "Confirm the user named this repo as the target.")
+    return problem
+
+
+def t3_merge_decision(payload):
+    tool_input = payload.get("tool_input") or {}
+    cwd = Path(payload.get("cwd") or os.getcwd())
+    project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or cwd)
+    repo = tool_input.get("repository") or remote(cwd)
+    branch_pr = gh_json(["pr", "view", "--json", "number"], cwd) if not tool_input.get("number") else None
+    number = tool_input.get("number") or (branch_pr.get("number") if isinstance(branch_pr, dict) else None)
+    return merge_decision(repo, number, tool_input.get("stack") is True, cwd, project)
+
+
+def expand(word, variables):
+    return re.sub(r"\$\{?(\w+)\}?", lambda m: variables.get(m[1], m[0]), word)
+
+
+def simple_commands(command):
+    """The words of each simple command, split at `;`, `&`, `|` and unquoted newlines; quoted text stays whole."""
+    lexer = shlex.shlex(HEREDOC.sub(r"\1\4", command).replace("\\\n", " "), posix=True, punctuation_chars=";&|\n")
+    lexer.whitespace, lexer.whitespace_split, lexer.commenters = " \t\r", True, ""
+    words = []
+    try:
+        for token in lexer:
+            if set(token) <= set(";&|\n"):
+                yield words
+                words = []
+            else:
+                words.append(token)
+    except ValueError:
+        yield from (line.split() for line in command.splitlines())
+        return
+    yield words
+
+
+def merge_async_calls(command):
+    """The repository and PR of every `gh api` merge-async request in the command, with variables assigned earlier
+    (plainly or through `export` and the like) expanded."""
+    variables = {}
+    for words in simple_commands(command):
+        start = 0
+        while start < len(words) and (words[start] in PREFIX_WORDS or re.match(r"^\w+=", words[start])):
+            if "=" in words[start]:
+                name, value = words[start].split("=", 1)
+                variables[name] = value
+            start += 1
+        if words[start:start + 2] == ["gh", "api"]:
+            found = next(filter(None, (MERGE_ASYNC.search(expand(w, variables)) for w in words[start + 2:])), None)
+            if found:
+                yield found[1], found[2]
+
+
+def merge_command_decision(command, cwd, project):
+    decisions = [merge_decision(repo, number, True, cwd, project) for repo, number in merge_async_calls(command)]
+    return next((d for d in decisions if d and d[0] == "deny"), None) or next(filter(None, decisions), None)
+
+
 def decide(payload):
+    if payload.get("tool_name") == T3_MERGE:
+        return t3_merge_decision(payload)
     if payload.get("tool_name") != "Bash":
         return None
     command = payload.get("tool_input", {}).get("command", "")
     cwd = Path(payload.get("cwd") or os.getcwd())
     project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or cwd)
+    merge = merge_command_decision(command, cwd, project)
+    if merge and merge[0] == "deny":
+        return merge
+    rest = shell_decision(command, cwd, project)
+    if rest and rest[0] == "deny" or not merge:
+        return rest
+    return ("ask", f"{rest[1]} {merge[1]}") if rest else merge
+
+
+def shell_decision(command, cwd, project):
     for words in segments(HEREDOC.sub(r"\1\4", command)):
         test = browser_test(words)
         if test:
@@ -405,7 +531,7 @@ def decide(payload):
                 errors = evidence_errors(body)
                 if errors:
                     return ("deny", "PR body fails the ship evidence gate: " + "; ".join(errors)
-                            + ". Fill Screenshots and Verified in browser per the ship skill before opening or updating the PR.")
+                            + ". Fill Screenshots and Verified in browser per the ship-it skill before opening or updating the PR.")
                 if claimed(browser_section(body)[1]):
                     uncovered = coverage_problems(words, here)
                     if uncovered:

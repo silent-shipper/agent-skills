@@ -46,6 +46,28 @@ esac
 printf '%s' "$FAKE_GH_CHECKS"
 """
 
+FAKE_GH_API = """#!/usr/bin/env python3
+import json, os, sys
+args = " ".join(sys.argv[1:])
+with open(os.environ["FAKE_GH_LOG"], "a") as log:
+    log.write(args + "\\n")
+replies = json.loads(os.environ["FAKE_GH_REPLIES"])
+if args not in replies:
+    sys.exit(1)
+print(json.dumps(replies[args]))
+"""
+MONOREPO = "defuse-protocol/defuse-frontend-monorepos"
+# The near.com database stack #1595 as GitHub listed it on 2026-11-24, bottom layer first.
+LAYERS = [(1479, "32f9c9af0a"), (1480, "1af265eb78"), (1481, "23b2a009e0"), (1482, "5eb37df745"), (1594, "da6501e7be"),
+          (1483, "40026f4160")]
+STACK_REPLIES = {
+    **{f"api repos/{MONOREPO}/pulls/{number}": {"number": number, "stack": {"number": 1595, "position": index, "size": 6}}
+       for index, (number, _) in enumerate(LAYERS, 1)},
+    f"api repos/{MONOREPO}/pulls/1601": {"number": 1601, "stack": None},
+    f"api repos/{MONOREPO}/stacks/1595": {"number": 1595, "pull_requests": [
+        {"number": number, "state": "open", "head": {"sha": sha}} for number, sha in LAYERS]},
+}
+
 # Body of #784, merged-ready while swaps were broken in the preview.
 UNPROVEN = """Stacked on #768.
 
@@ -334,6 +356,97 @@ class AgentGuardTests(unittest.TestCase):
             result, _ = self.checks("gh pr merge 803 --squash", mode=mode)
             self.assertEqual(result[0], "ask", mode)
             self.assertIn(reason, result[1])
+
+    def stack_merge(self, payload, replies=STACK_REPLIES):
+        bin_dir = self.root / "stack-bin"
+        bin_dir.mkdir(exist_ok=True)
+        (bin_dir / "gh").write_text(FAKE_GH_API)
+        (bin_dir / "gh").chmod(0o755)
+        log = self.root / "gh-api.log"
+        env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "FAKE_GH_LOG": str(log), "FAKE_GH_REPLIES": json.dumps(replies),
+               "CLAUDE_PROJECT_DIR": str(self.app)}
+        with patch.dict(os.environ, env):
+            return guard.decide({"cwd": str(self.app), **payload})
+
+    def t3_merge(self, **tool_input):
+        return self.stack_merge({"tool_name": guard.T3_MERGE, "tool_input": tool_input})
+
+    def test_merging_one_stack_layer_is_denied(self):
+        # 2026-11-23: a lower layer went in alone with this command, after the user said never to merge a layer alone.
+        command = (f"R=repos/{MONOREPO}; gh api -X PUT $R/pulls/1480/merge-async "
+                   "-f sha=1af265eb78 -f merge_method=squash 2>&1 | head -20")
+        result = self.stack_merge({"tool_name": "Bash", "tool_input": {"command": command}})
+        self.assertEqual(result[0], "deny")
+        self.assertIn("layer 2 of 6 in stack #1595", result[1])
+        self.assertIn("number: 1483, stack: true", result[1])
+        self.assertIn("40026f4160", result[1])
+        for tool_input in ({"number": 1480, "expectedHeadSha": "1af265eb78", "method": "squash"},
+                           {"number": 1480, "expectedHeadSha": "1af265eb78", "stack": True},
+                           {"number": 1483, "expectedHeadSha": "40026f4160"}):
+            self.assertEqual(self.t3_merge(repository=MONOREPO, **tool_input)[0], "deny", tool_input)
+
+    def test_whole_stack_and_unstacked_merges_are_allowed(self):
+        self.assertIsNone(self.t3_merge(repository=MONOREPO, number=1483, stack=True, expectedHeadSha="40026f4160"))
+        self.assertIsNone(self.t3_merge(repository=MONOREPO, number=1601, expectedHeadSha="a7ff402bc7"))
+        top = f"gh api -X PUT repos/{MONOREPO}/pulls/1483/merge-async -f sha=40026f4160 -f merge_method=squash"
+        poll = f"gh api repos/{MONOREPO}/pulls/1480/merge-async/05e67f6b-891c-4661-9a09-ad94a8ca5522"
+        for command in (top, poll):
+            self.assertIsNone(self.stack_merge({"tool_name": "Bash", "tool_input": {"command": command}}), command)
+
+    def test_partial_merges_split_across_lines_or_without_a_listing_are_denied(self):
+        lower = f"gh api -X PUT repos/{MONOREPO}/pulls/1480/merge-async -f sha=1af265eb78"
+        top = f"gh api -X PUT repos/{MONOREPO}/pulls/1483/merge-async -f sha=40026f4160"
+        for command in (f"R=repos/{MONOREPO}\ngh api -X PUT $R/pulls/1480/merge-async -f sha=1af265eb78",
+                        f"echo merging\ngh api --method PUT /repos/{MONOREPO}/pulls/1480/merge-async -f sha=1af265eb78",
+                        f"cd /tmp\n{lower}", f"{top}\n{lower}", f"{top} && \\\n  {lower}"):
+            result = self.stack_merge({"tool_name": "Bash", "tool_input": {"command": command}})
+            self.assertEqual(result[0], "deny", command)
+        no_listing = {key: value for key, value in STACK_REPLIES.items() if "/stacks/" not in key}
+        result = self.stack_merge({"tool_name": guard.T3_MERGE, "tool_input": {
+            "repository": MONOREPO, "number": 1480, "stack": True, "expectedHeadSha": "1af265eb78"}}, no_listing)
+        self.assertEqual(result[0], "deny")
+        self.assertIn("stacks/1595", result[1])
+        self.assertIsNone(self.stack_merge({"tool_name": guard.T3_MERGE, "tool_input": {
+            "repository": MONOREPO, "number": 1483, "stack": True, "expectedHeadSha": "40026f4160"}}, no_listing))
+
+    def test_exported_variables_quoted_text_and_other_denials_are_handled(self):
+        exported = f"export R=repos/{MONOREPO}\ngh api -X PUT $R/pulls/1480/merge-async -f sha=1af265eb78"
+        self.assertEqual(self.stack_merge({"tool_name": "Bash", "tool_input": {"command": exported}})[0], "deny")
+        quoted = f'git log -1 --format="%h\ngh api -X PUT repos/{MONOREPO}/pulls/1480/merge-async"'
+        self.assertIsNone(self.stack_merge({"tool_name": "Bash", "tool_input": {"command": quoted}}))
+        no_position = {f"api repos/{MONOREPO}/pulls/1480": {"number": 1480, "stack": {"number": 1595}}}
+        result = self.stack_merge({"tool_name": guard.T3_MERGE, "tool_input": {
+            "repository": MONOREPO, "number": 1480, "expectedHeadSha": "1af265eb78"}}, no_position)
+        self.assertEqual(result[0], "deny")
+        replies = {"api repos/silent-shipper/nearcom-verify/pulls/66": {"number": 66, "stack": None}}
+        both = "gh api -X PUT repos/silent-shipper/nearcom-verify/pulls/66/merge-async -f sha=x && bun run test --run"
+        result = self.stack_merge({"tool_name": "Bash", "tool_input": {"command": both}}, replies)
+        self.assertEqual(result[0], "deny")
+        self.assertIn("work lane", result[1])
+
+    def test_merging_in_another_repo_asks(self):
+        replies = {"api repos/silent-shipper/nearcom-verify/pulls/66": {"number": 66, "stack": None}}
+        result = self.stack_merge({"tool_name": guard.T3_MERGE, "tool_input": {
+            "repository": "silent-shipper/nearcom-verify", "number": 66, "expectedHeadSha": "efec257c0c"}}, replies)
+        self.assertEqual(result[0], "ask")
+        self.assertIn("silent-shipper/nearcom-verify", result[1])
+        command = "gh api -X PUT repos/silent-shipper/nearcom-verify/pulls/66/merge-async -f sha=efec257c0c"
+        self.assertEqual(self.stack_merge({"tool_name": "Bash", "tool_input": {"command": command}}, replies)[0], "ask")
+
+    def test_branch_pr_is_resolved_and_unreadable_stacks_ask(self):
+        replies = {**STACK_REPLIES, "pr view --json number": {"number": 1480}}
+        result = self.stack_merge({"tool_name": guard.T3_MERGE, "tool_input": {"expectedHeadSha": "1af265eb78"}}, replies)
+        self.assertEqual(result[0], "deny")
+        merge = {"repository": MONOREPO, "number": 1480, "stack": True, "expectedHeadSha": "1af265eb78"}
+        no_position = {f"api repos/{MONOREPO}/pulls/1480": {"number": 1480, "stack": {"number": 1595}}}
+        odd = {f"api repos/{MONOREPO}/pulls/1480": [{"number": 1480}],
+               f"api repos/{MONOREPO}/stacks/1595": ["not", "a", "listing"]}
+        for replies in ({}, no_position, odd):
+            result = self.stack_merge({"tool_name": guard.T3_MERGE, "tool_input": merge}, replies)
+            self.assertEqual(result[0], "ask", replies)
+        odd_listing = {f"api repos/{MONOREPO}/pulls/1480": STACK_REPLIES[f"api repos/{MONOREPO}/pulls/1480"],
+                       f"api repos/{MONOREPO}/stacks/1595": {"pull_requests": [["1479"], {"state": "open", "number": 1483}]}}
+        self.assertEqual(self.stack_merge({"tool_name": guard.T3_MERGE, "tool_input": merge}, odd_listing)[0], "deny")
 
 
 if __name__ == "__main__":

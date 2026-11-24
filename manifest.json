@@ -132,7 +132,7 @@
       }
     },
     {
-      "name": "ship",
+      "name": "ship-it",
       "codex_enabled": true,
       "upstream": {
         "repo": "cursor/plugins",

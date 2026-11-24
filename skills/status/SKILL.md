@@ -45,7 +45,9 @@ Files: N total — T tests, C code
   lines are outside the narrative word cap and three-change-bullet limit.
 - For several PRs, use one linked line per independent PR or stack and preserve
   the requested readiness groups. A stack is one decision unit; link its member
-  PRs.
+  PRs. When the user asks what a PR or stack does, give one linked line per PR,
+  bottom first: what it changes for users or the team in plain words, then how
+  it was proven.
 - One **Needs you** line per decision, never dropped to save words; combine
   decisions that share a call. Leave out low risk; state a real risk in a few
   words.

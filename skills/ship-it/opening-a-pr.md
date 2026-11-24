@@ -1,7 +1,8 @@
 # Open or update the PR
 
 Push the branch using its configured remote; set an upstream when needed. Check
-for an existing PR before creating one. Update its description when the final
+for an existing PR before creating one, including another open PR that already
+fixes the same problem; reuse it or stack on it. Update its description when the final
 scope changes. Use this exact PR-body format, preserving headings, order and
 field labels. Put repository-required details in the relevant sections:
 

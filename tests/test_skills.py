@@ -154,7 +154,35 @@ class SkillInstallationTests(unittest.TestCase):
         data = json.loads(settings.read_text())
         commands = [h["command"] for e in data["hooks"]["PreToolUse"] for h in e["hooks"]]
         self.assertEqual(commands, [str(self.home / ".agents/agent-guard.py")])
+        self.assertEqual(data["hooks"]["PreToolUse"][0]["matcher"], "Bash|mcp__t3-code__pull_request_merge")
+        self.assertEqual(data["skillOverrides"], {"ship-local": "user-invocable-only", "steward": "user-invocable-only"})
         self.assertEqual((data["model"], data["hooks"]["Stop"]), ("opus", []))
+
+    def test_install_extends_an_existing_bash_guard_and_keeps_user_overrides(self):
+        settings = self.home / ".claude/settings.json"
+        settings.parent.mkdir(parents=True)
+        guard = {"type": "command", "command": str(self.home / ".agents/agent-guard.py")}
+        settings.write_text(json.dumps({"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [guard]}]},
+                                        "skillOverrides": {"steward": "on"}}))
+        skills.install()
+        data = json.loads(settings.read_text())
+        self.assertEqual(data["hooks"]["PreToolUse"], [{"matcher": "Bash|mcp__t3-code__pull_request_merge", "hooks": [guard]}])
+        self.assertEqual(data["skillOverrides"], {"steward": "on", "ship-local": "user-invocable-only"})
+
+    def test_install_moves_a_shared_guard_out_of_other_hooks_and_keeps_the_file_private(self):
+        settings = self.home / ".claude/settings.json"
+        settings.parent.mkdir(parents=True)
+        guard = {"type": "command", "command": str(self.home / ".agents/agent-guard.py"), "timeout": 90}
+        other = {"type": "command", "command": "/usr/local/bin/audit-shell"}
+        settings.write_text(json.dumps({"env": {"ANTHROPIC_AUTH_TOKEN": "secret"},
+                                        "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [guard, other]}]}}))
+        settings.chmod(0o600)
+        skills.install()
+        skills.install()
+        data = json.loads(settings.read_text())
+        self.assertEqual(data["hooks"]["PreToolUse"], [{"matcher": "Bash", "hooks": [other]},
+                                                        {"matcher": "Bash|mcp__t3-code__pull_request_merge", "hooks": [guard]}])
+        self.assertEqual(settings.stat().st_mode & 0o777, 0o600)
 
     def test_installed_receipt_records_content_identity(self):
         skills.install()

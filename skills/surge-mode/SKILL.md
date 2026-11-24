@@ -37,7 +37,7 @@ predicate first, riskiest unknown next, a check after each unit.
 | New or changed behavior | [Feature](playbooks/feature.md) |
 | Behavior-preserving change to structure | [Refactoring](playbooks/refactoring.md) |
 | Resuming or taking over prior in-flight work | [Session pickup](playbooks/session-pickup.md) |
-| Commit, push, open or update a PR, or check on, babysit or get a PR green | `ship` |
+| Commit, push, open or update a PR; check on, babysit or get a PR green; fix conflicts, approve or merge a PR or stack | `ship-it` |
 
 ## Route the work
 

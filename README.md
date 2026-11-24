@@ -55,7 +55,7 @@ text, so installed hashes do not prove which text a running agent already read.
 - `retro` — learn from completed work
 - `review-guide` — Capy-style guided review page for a change
 - `sharpen` — restate the goal and expert approach, then confirm
-- `ship` — commit, push, open the PR, then babysit CI and review feedback
+- `ship-it` — commit, push, open the PR, babysit CI and review feedback, and land PRs and stacks (named `ship-it` because Claude Code reserves `ship` for its bundled `/ship`)
 - `surge-mode` — apply Surge's working style: playbooks, principles and routing
 - `show-me-your-work` — decision log for long or unattended runs
 - `status` — ultra-concise catch-up on what changed and what waits on the user
