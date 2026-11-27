@@ -31,6 +31,11 @@ requested scope and checkpoint; project guidance supplies domain rules.
   is proven, confirmed blockers are resolved and material gaps are stated;
   "perfect", "100%" and "principal engineer approval" require rigorous judgment,
   not promises of zero bugs.
+- Slowness is a bug. Diagnose why something is slow instead of waiting it out.
+  When the `slow-turn-retro` Stop hook asks for a retro (10+ active minutes and
+  a slow command that keeps recurring), do it: fix the default path inside the
+  repository this thread may change, propose anything beyond it in the
+  `Speedup retro:` line, and keep accuracy, verification and scope intact.
 - Existing authorization persists. "Ship it" or "commit and push" authorizes
   those actions for the agreed scope. Honor local-only checkpoints. When CI
   follow-through is requested, verify the latest PR head and finish authorized

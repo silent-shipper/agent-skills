@@ -156,7 +156,19 @@ class SkillInstallationTests(unittest.TestCase):
         self.assertEqual(commands, [str(self.home / ".agents/agent-guard.py")])
         self.assertEqual(data["hooks"]["PreToolUse"][0]["matcher"], "Bash|mcp__t3-code__pull_request_merge")
         self.assertEqual(data["skillOverrides"], {"ship-local": "user-invocable-only", "steward": "user-invocable-only"})
-        self.assertEqual((data["model"], data["hooks"]["Stop"]), ("opus", []))
+        self.assertEqual(data["model"], "opus")
+
+    def test_install_registers_slow_turn_retro_once_for_claude_and_codex(self):
+        settings = self.home / ".claude/settings.json"
+        settings.parent.mkdir(parents=True)
+        other = {"hooks": [{"type": "command", "command": "/usr/local/bin/notify"}]}
+        settings.write_text(json.dumps({"hooks": {"Stop": [other]}}))
+        skills.install()
+        skills.install()
+        retro = {"hooks": [{"type": "command", "command": str(self.home / ".agents/slow-turn-retro.py"), "timeout": 10}]}
+        self.assertEqual(json.loads(settings.read_text())["hooks"]["Stop"], [other, retro])
+        self.assertEqual(json.loads((self.home / ".codex/hooks.json").read_text()), {"hooks": {"Stop": [retro]}})
+        self.assertEqual((self.home / ".agents/slow-turn-retro.py").resolve(), skills.REPO / "scripts/slow-turn-retro.py")
 
     def test_install_extends_an_existing_bash_guard_and_keeps_user_overrides(self):
         settings = self.home / ".claude/settings.json"
@@ -277,6 +289,7 @@ class SkillInstallationTests(unittest.TestCase):
         shutil.copy2(skills.REPO / 'scripts/skills.py', origin / 'scripts/skills.py')
         shutil.copy2(skills.REPO / 'scripts/check-skills.py', origin / 'scripts/check-skills.py')
         shutil.copy2(skills.REPO / 'scripts/agent-guard.py', origin / 'scripts/agent-guard.py')
+        shutil.copy2(skills.REPO / 'scripts/slow-turn-retro.py', origin / 'scripts/slow-turn-retro.py')
         shutil.copy2(skills.REPO / 'scripts/heavy.py', origin / 'scripts/heavy.py')
         shutil.copytree(skills.REPO / 'skills/architect', origin / 'skills/architect')
         (origin / 'manifest.json').write_text(json.dumps({'version': 1, 'skills': [{'name': 'architect', 'codex_enabled': True}]}))

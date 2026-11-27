@@ -244,6 +244,7 @@ def managed_paths(skills):
         paths[HOME_DIR / path] = REPO / "surge-defaults.md"
     paths[HOME_DIR / ".agents/check-skills.py"] = REPO / "scripts/check-skills.py"
     paths[HOME_DIR / ".agents/agent-guard.py"] = REPO / "scripts/agent-guard.py"
+    paths[HOME_DIR / ".agents/slow-turn-retro.py"] = REPO / "scripts/slow-turn-retro.py"
     paths[HOME_DIR / ".local/bin/heavy"] = REPO / "scripts/heavy.py"
     if (HOME_DIR / ".claude-alt").is_dir():
         paths[HOME_DIR / ".claude-alt/CLAUDE.md"] = REPO / "surge-defaults.md"
@@ -276,9 +277,38 @@ GUARD_MATCHER = "Bash|mcp__t3-code__pull_request_merge"
 BUNDLED_SKILL_OVERRIDES = {"ship-local": "user-invocable-only", "steward": "user-invocable-only"}
 
 
+def stop_hook(settings):
+    """Register slow-turn-retro once on Stop; Claude's settings.json and Codex's hooks.json share the shape."""
+    command = str(HOME_DIR / ".agents/slow-turn-retro.py")
+    stops = settings.setdefault("hooks", {}).setdefault("Stop", [])
+    if not any(h.get("command") == command for entry in stops for h in entry.get("hooks", [])):
+        stops.append({"hooks": [{"type": "command", "command": command, "timeout": 10}]})
+
+
+def save_json(path, settings):
+    mode = path.stat().st_mode & 0o777 if path.exists() else 0o600
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".skill-config-tmp")
+    with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as handle:
+        os.fchmod(handle.fileno(), mode)
+        handle.write(json.dumps(settings, indent=2) + "\n")
+    temporary.replace(path)
+
+
+def configure_codex():
+    """Run slow-turn-retro when a Codex turn stops. Codex skips a new hook until it is trusted once through /hooks."""
+    path = HOME_DIR / ".codex/hooks.json"
+    settings = json.loads(path.read_text()) if path.exists() else {}
+    before = json.dumps(settings, sort_keys=True)
+    stop_hook(settings)
+    if json.dumps(settings, sort_keys=True) != before:
+        save_json(path, settings)
+
+
 def configure_claude():
-    """Run agent-guard on shell commands and T3 merges, and keep the bundled /ship and /steward, which never merge
-    and reserve the name `ship`, typable but out of Claude's skill list so `ship-it` handles shipping."""
+    """Run agent-guard on shell commands and T3 merges and slow-turn-retro on Stop, and keep the bundled /ship and
+    /steward, which never merge and reserve the name `ship`, typable but out of Claude's skill list so `ship-it` handles
+    shipping."""
     command = str(HOME_DIR / ".agents/agent-guard.py")
     for home in (".claude", ".claude-alt"):
         if home == ".claude-alt" and not (HOME_DIR / home).is_dir():
@@ -296,18 +326,12 @@ def configure_claude():
                 entry["hooks"] = [h for h in entry["hooks"] if h.get("command") != command]
             hooks[:] = [entry for entry in hooks if entry.get("hooks") or not any(entry is mine for mine in ours)]
             hooks.append({"matcher": GUARD_MATCHER, "hooks": moved[:1] or [{"type": "command", "command": command}]})
+        stop_hook(settings)
         overrides = settings.setdefault("skillOverrides", {})
         for name, state in BUNDLED_SKILL_OVERRIDES.items():
             overrides.setdefault(name, state)
-        if json.dumps(settings, sort_keys=True) == before:
-            continue
-        mode = path.stat().st_mode & 0o777 if path.exists() else 0o600
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_name("settings.json.skill-config-tmp")
-        with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as handle:
-            os.fchmod(handle.fileno(), mode)
-            handle.write(json.dumps(settings, indent=2) + "\n")
-        temporary.replace(path)
+        if json.dumps(settings, sort_keys=True) != before:
+            save_json(path, settings)
 
 
 def backup(path, directory):
@@ -340,6 +364,7 @@ def install(synced=False):
         temporary.chmod(0o600)
         temporary.replace(config)
     configure_claude()
+    configure_codex()
     idle_sim_agent()
     try:
         check(installation_only=True)

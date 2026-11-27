@@ -273,3 +273,26 @@ typechecks, Playwright runs, `node` scripts that start a browser, and local shel
 `install` also loads `com.surge.heavy.idle-sim`, which runs `heavy idle-sim` every five minutes. It shuts down every
 booted simulator once 30 minutes pass with no `heavy` browser job, near-verify worker, Xcode, simctl, Maestro, Detox,
 Appium or Expo iOS process, and Simulator.app not in front. Log: `~/Library/Logs/heavy/idle-sim.log`.
+
+## Slow-turn retro
+
+`install` registers `scripts/slow-turn-retro.py` as a Stop hook for Claude Code (`~/.claude/settings.json`) and Codex
+(`~/.codex/hooks.json`; Codex skips a new or changed hook until it is trusted once through `/hooks`). It logs every Stop
+to `~/.local/state/slow-turn-retro/log.jsonl` and continues the turn with a three-minute speedup retro only when all of
+these hold:
+
+- 10+ minutes of active work, not counting waits on the user, timers, CI or log watchers, and subagents;
+- a turn the user started (not a scheduled task, an agent-sent message, a headless run or a nested `claude -p`);
+- a non-file tool call of 30s or more, or 60s of timer waits, and a median model step under 45s;
+- a shell command that was slow in 3+ turns over 14 days and had no retro in the last 7;
+- fewer than 3 retros in the last 24 hours.
+
+The retro fixes the default path only inside the repository the thread may already change and proposes anything else
+in its `Speedup retro:` line. The closing Stop logs `retro_s` and that line, and blocks once more if the final message
+dropped the answer given before the retro.
+
+```sh
+python3 scripts/slow-turn-retro.py --dry-run <transcript.jsonl>  # timing and decision for its last turn
+python3 scripts/slow-turn-retro.py --report 7                    # did retro'd commands get faster than the retros cost
+touch ~/.local/state/slow-turn-retro/off                         # silence the hook on this Mac
+```
